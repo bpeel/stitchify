@@ -23,6 +23,40 @@ use image::Pixel;
 const BOX_WIDTH: u16 = 20;
 const LINE_WIDTH: f32 = BOX_WIDTH as f32 / 6.0;
 
+fn generate_box(
+    box_width: u16,
+    box_height: u16,
+    x: u16,
+    y: u16,
+    color: &image::Rgb<u8>,
+) -> XMLElement {
+    let mut path = XMLElement::new("path");
+
+    path.add_attribute(
+        "fill",
+        format!(
+            "rgb({}%, {}%, {}%)",
+            color[0] as f32 * 100.0 / 255.0,
+            color[1] as f32 * 100.0 / 255.0,
+            color[2] as f32 * 100.0 / 255.0,
+        ),
+    );
+
+    path.add_attribute(
+        "d",
+        format!(
+            "M {} {} l {} 0 l 0 {} l -{} 0 z",
+            x * box_width,
+            y * box_height,
+            box_width,
+            box_height,
+            box_width,
+        ),
+    );
+
+    path
+}
+
 fn generate_boxes(
     box_width: u16,
     box_height: u16,
@@ -36,45 +70,25 @@ fn generate_boxes(
         let x = stitch_num as u16 % fabric.n_stitches();
         let y = stitch_num as u16 / fabric.n_stitches();
 
-        let mut path = XMLElement::new("path");
-
-        path.add_attribute(
-            "fill",
-            format!(
-                "rgb({}%, {}%, {}%)",
-                stitch.color[0] as f32 * 100.0 / 255.0,
-                stitch.color[1] as f32 * 100.0 / 255.0,
-                stitch.color[2] as f32 * 100.0 / 255.0,
-            ),
-        );
-
-        path.add_attribute(
-            "d",
-            format!(
-                "M {} {} l {} 0 l 0 {} l -{} 0 z",
-                x * box_width,
-                y * box_height,
-                box_width,
-                box_height,
-                box_width,
-            ),
-        );
-
-        group.add_child(path);
+        group.add_child(generate_box(
+            box_width,
+            box_height,
+            x,
+            y,
+            &stitch.color,
+        ));
     }
 
     group
 }
 
-fn generate_grid(
+fn generate_grid_no_id(
     box_width: u16,
     box_height: u16,
     n_columns: u16,
     n_rows: u16,
 ) -> XMLElement {
     let mut path = XMLElement::new("path");
-
-    path.add_attribute("id", "grid");
 
     path.add_attribute("stroke-width", LINE_WIDTH);
     path.add_attribute("stroke-linecap", "square");
@@ -110,6 +124,24 @@ fn generate_grid(
     }
 
     path.add_attribute("d", path_str);
+
+    path
+}
+
+fn generate_grid(
+    box_width: u16,
+    box_height: u16,
+    n_columns: u16,
+    n_rows: u16,
+) -> XMLElement {
+    let mut path = generate_grid_no_id(
+        box_width,
+        box_height,
+        n_columns,
+        n_rows
+    );
+
+    path.add_attribute("id", "grid");
 
     path
 }
@@ -181,6 +213,28 @@ fn generate_rulers(
     group
 }
 
+fn generate_box_thread_text(
+    thread: u16,
+    x: u16,
+    y: u16,
+    color: &image::Rgb<u8>,
+) -> XMLElement {
+    let mut element = XMLElement::new("use");
+
+    element.add_attribute(
+        "xlink:href",
+        format!("#thread-{}", thread)
+    );
+    element.add_attribute("x", x);
+    element.add_attribute("y", y);
+
+    if color.channels().iter().map(|&x| x as u16).sum::<u16>() < 384 {
+        element.add_attribute("fill", "rgb(100%, 100%, 100%)");
+    }
+
+    element
+}
+
 fn generate_box_threads(
     box_width: u16,
     box_height: u16,
@@ -194,24 +248,75 @@ fn generate_box_threads(
         let x = stitch_num as u16 % fabric.n_stitches();
         let y = stitch_num as u16 / fabric.n_stitches();
 
-        let mut element = XMLElement::new("use");
-        element.add_attribute(
-            "xlink:href",
-            format!("#thread-{}", stitch.thread)
-        );
-        element.add_attribute("x", x * box_width);
-        element.add_attribute("y", y * box_height);
-
-        if stitch.color.channels()
-            .iter()
-            .map(|&x| x as u16).sum::<u16>()
-            < 384
-        {
-            element.add_attribute("fill", "rgb(100%, 100%, 100%)");
-        }
-
-        group.add_child(element);
+        group.add_child(generate_box_thread_text(
+            stitch.thread,
+            x * box_width,
+            y * box_height,
+            &stitch.color,
+        ));
     }
+
+    group
+}
+
+fn generate_thread_counts(
+    box_width: u16,
+    box_height: u16,
+    fabric: &Fabric,
+) -> XMLElement {
+    let mut group = XMLElement::new("g");
+
+    group.add_attribute("id", "thread-counts");
+
+    group.add_attribute(
+        "transform",
+        format!(
+            "translate({} {})",
+            box_width,
+            box_height * (fabric.n_rows() + 2),
+        ),
+    );
+
+    let mut counts = XMLElement::new("g");
+
+    set_text_appearance(&mut counts, box_height);
+
+    for (y, thread) in fabric.threads().iter().enumerate() {
+        group.add_child(generate_box(
+            box_width,
+            box_height,
+            0,
+            y as u16,
+            &thread.color,
+        ));
+
+        group.add_child(generate_box_thread_text(
+            thread.id,
+            0,
+            y as u16 * box_height,
+            &thread.color,
+        ));
+
+        let mut count_text = XMLElement::new("text");
+        set_text_position(
+            &mut count_text,
+            box_width,
+            box_height,
+            box_width,
+            y as u16 * box_height,
+        );
+        count_text.add_text(format!("{}", thread.stitch_count));
+        counts.add_child(count_text);
+    }
+
+    group.add_child(generate_grid_no_id(
+        box_width,
+        box_height,
+        1,
+        fabric.threads().len() as u16,
+    ));
+
+    group.add_child(counts);
 
     group
 }
@@ -263,8 +368,9 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
 
     let svg_width = ((fabric.n_stitches() + 1) * BOX_WIDTH) as f32
         + LINE_WIDTH / 2.0;
-    let svg_height = ((fabric.n_rows() + 1) * box_height) as f32
-        + LINE_WIDTH / 2.0;
+    let svg_height = ((fabric.n_rows() + 2 + fabric.threads().len() as u16)
+                      * box_height) as f32
+        + LINE_WIDTH;
 
     svg.add_attribute("xmlns", "http://www.w3.org/2000/svg");
     svg.add_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
@@ -301,6 +407,12 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
     ));
 
     translation.add_child(generate_box_threads(
+        BOX_WIDTH,
+        box_height,
+        fabric,
+    ));
+
+    translation.add_child(generate_thread_counts(
         BOX_WIDTH,
         box_height,
         fabric,
