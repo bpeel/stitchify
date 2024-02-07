@@ -73,6 +73,20 @@ def find_thread(threads, color, stitch_x, stitch_y):
     threads.append(Thread(len(threads), stitch_x, stitch_y, color))
     return threads[-1]
 
+def draw_text_in_box(cr, text, x, y):
+    extents = cr.text_extents(text)
+    cr.move_to(x + 0.5 * BOX_WIDTH - extents.x_advance / 2.0,
+               y + 0.7 * BOX_HEIGHT)
+    cr.show_text(text)
+
+def draw_thread_text(cr, thread, x, y):
+    if sum(thread.color) < 1.5:
+        cr.set_source_rgb(1.0, 1.0, 1.0)
+    else:
+        cr.set_source_rgb(0.0, 0.0, 0.0)
+
+    draw_text_in_box(cr, thread.text, x, y)
+
 png_file = sys.argv[1]
 svg_file = os.path.splitext(png_file)[0] + ".svg"
 
@@ -117,7 +131,9 @@ for stitch_y in range(n_rows - 1, -1, -1):
 
 surface = cairo.SVGSurface(svg_file,
                            (N_STITCHES + 1) * BOX_WIDTH + LINE_WIDTH / 2.0,
-                           (n_rows + 1) * BOX_HEIGHT + LINE_WIDTH / 2.0)
+                           (n_rows + 2 + len(threads))
+                           * BOX_HEIGHT
+                           + LINE_WIDTH)
 
 cr = cairo.Context(surface)
 
@@ -177,14 +193,36 @@ for y in range(n_rows):
 
 for y in range(n_rows):
     for x in range(N_STITCHES):
-        thread = stitches[x + y * N_STITCHES].thread
+        draw_thread_text(cr,
+                         stitches[x + y * N_STITCHES].thread,
+                         x * BOX_WIDTH,
+                         y * BOX_HEIGHT)
 
-        if sum(thread.color) < 1.5:
-            cr.set_source_rgb(1.0, 1.0, 1.0)
-        else:
-            cr.set_source_rgb(0.0, 0.0, 0.0)
+threads.sort(key = lambda thread: (len(thread.text), thread.text))
 
-        extents = cr.text_extents(thread.text)
-        cr.move_to((x + 0.5) * BOX_WIDTH - extents.x_advance / 2.0,
-                   (y + 0.7) * BOX_HEIGHT)
-        cr.show_text(thread.text)
+cr.save()
+cr.translate(BOX_WIDTH, (n_rows + 2) * BOX_HEIGHT)
+
+for i, thread in enumerate(threads):
+    cr.rectangle(0, i * BOX_HEIGHT, BOX_WIDTH, BOX_HEIGHT)
+    cr.set_source_rgb(*thread.color)
+    cr.fill()
+    draw_thread_text(cr, thread, 0, i * BOX_HEIGHT)
+    cr.set_source_rgb(0, 0, 0)
+    draw_text_in_box(cr, f"{thread.stitch_count}", BOX_WIDTH, i * BOX_HEIGHT)
+
+cr.set_line_width(LINE_WIDTH)
+cr.set_line_cap(cairo.LINE_CAP_SQUARE)
+cr.set_source_rgb(0.71, 0.71, 0.71)
+
+for i in range(len(threads) + 1):
+    cr.move_to(0, i * BOX_HEIGHT)
+    cr.rel_line_to(BOX_WIDTH, 0)
+
+for i in range(2):
+    cr.move_to(i * BOX_WIDTH, 0)
+    cr.rel_line_to(0, BOX_HEIGHT * len(threads))
+
+cr.stroke()
+
+cr.restore()
