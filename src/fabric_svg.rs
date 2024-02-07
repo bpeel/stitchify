@@ -29,6 +29,8 @@ fn generate_boxes(
 ) -> XMLElement {
     let mut group = XMLElement::new("g");
 
+    group.add_attribute("id", "boxes");
+
     for (stitch_num, stitch) in fabric.stitches().iter().enumerate() {
         let x = stitch_num as u16 % fabric.n_stitches();
         let y = stitch_num as u16 / fabric.n_stitches();
@@ -70,6 +72,8 @@ fn generate_grid(
     n_rows: u16,
 ) -> XMLElement {
     let mut path = XMLElement::new("path");
+
+    path.add_attribute("id", "grid");
 
     path.add_attribute("stroke-width", LINE_WIDTH);
     path.add_attribute("stroke-linecap", "square");
@@ -128,6 +132,8 @@ fn generate_rulers(
     n_rows: u16,
 ) -> XMLElement {
     let mut group = XMLElement::new("g");
+
+    group.add_attribute("id", "rulers");
 
     group.add_attribute("font-family", "Sans");
     group.add_attribute("font-size", box_height as f32 * 0.6);
