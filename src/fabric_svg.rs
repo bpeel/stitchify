@@ -18,6 +18,7 @@ use super::fabric::Fabric;
 use simple_xml_builder::XMLElement;
 use super::config::Dimensions;
 use std::fmt::Write;
+use image::Pixel;
 
 const BOX_WIDTH: u16 = 20;
 const LINE_WIDTH: f32 = BOX_WIDTH as f32 / 6.0;
@@ -113,6 +114,14 @@ fn generate_grid(
     path
 }
 
+fn set_text_appearance(
+    element: &mut XMLElement,
+    box_height: u16,
+) {
+    element.add_attribute("font-family", "Sans");
+    element.add_attribute("font-size", box_height as f32 * 0.6);
+}
+
 fn set_text_position(
     text: &mut XMLElement,
     box_width: u16,
@@ -135,8 +144,7 @@ fn generate_rulers(
 
     group.add_attribute("id", "rulers");
 
-    group.add_attribute("font-family", "Sans");
-    group.add_attribute("font-size", box_height as f32 * 0.6);
+    set_text_appearance(&mut group, box_height);
 
     for y in 0..n_rows {
         let mut text = XMLElement::new("text");
@@ -173,6 +181,79 @@ fn generate_rulers(
     group
 }
 
+fn generate_box_threads(
+    box_width: u16,
+    box_height: u16,
+    fabric: &Fabric,
+) -> XMLElement {
+    let mut group = XMLElement::new("g");
+
+    group.add_attribute("id", "box-threads");
+
+    for (stitch_num, stitch) in fabric.stitches().iter().enumerate() {
+        let x = stitch_num as u16 % fabric.n_stitches();
+        let y = stitch_num as u16 / fabric.n_stitches();
+
+        let mut element = XMLElement::new("use");
+        element.add_attribute(
+            "xlink:href",
+            format!("#thread-{}", stitch.thread)
+        );
+        element.add_attribute("x", x * box_width);
+        element.add_attribute("y", y * box_height);
+
+        if stitch.color.channels()
+            .iter()
+            .map(|&x| x as u16).sum::<u16>()
+            < 384
+        {
+            element.add_attribute("fill", "rgb(100%, 100%, 100%)");
+        }
+
+        group.add_child(element);
+    }
+
+    group
+}
+
+fn generate_defs(
+    fabric: &Fabric,
+    box_width: u16,
+    box_height: u16,
+) -> XMLElement {
+    let mut defs = XMLElement::new("defs");
+
+    for thread in fabric.threads().iter() {
+        let text = if thread.id == 0 {
+            "A".to_string()
+        } else {
+            let mut parts = Vec::new();
+            let mut id = thread.id;
+
+            while id > 0 {
+                parts.push(
+                    char::from_u32('A' as u32 + id as u32 % 26).unwrap()
+                );
+                id /= 26;
+            }
+
+            parts.iter().rev().collect::<String>()
+        };
+
+        let mut element = XMLElement::new("text");
+
+        set_text_appearance(&mut element, box_height);
+        set_text_position(&mut element, box_width, box_height, 0, 0);
+
+        element.add_text(text);
+        element.add_attribute("id", format!("thread-{}", thread.id));
+
+        defs.add_child(element);
+    }
+
+    defs
+}
+
 pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
     let box_height = BOX_WIDTH
         * dimensions.gauge_stitches
@@ -186,9 +267,12 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
         + LINE_WIDTH / 2.0;
 
     svg.add_attribute("xmlns", "http://www.w3.org/2000/svg");
+    svg.add_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
     svg.add_attribute("width", svg_width);
     svg.add_attribute("height", svg_height);
     svg.add_attribute("viewBox", format!("0 0 {} {}", svg_width, svg_height));
+
+    svg.add_child(generate_defs(fabric, BOX_WIDTH, box_height));
 
     let mut translation = XMLElement::new("g");
     translation.add_attribute(
@@ -214,6 +298,12 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
         box_height,
         fabric.n_stitches(),
         fabric.n_rows(),
+    ));
+
+    translation.add_child(generate_box_threads(
+        BOX_WIDTH,
+        box_height,
+        fabric,
     ));
 
     svg.add_child(translation);
