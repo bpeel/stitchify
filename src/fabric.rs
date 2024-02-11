@@ -70,7 +70,7 @@ impl Fabric {
         let sample_height = sample_width
             * dimensions.gauge_stitches as f32
             / dimensions.gauge_rows as f32;
-        let n_rows = (image.height() as f32 / sample_height) as u16;
+        let n_rows = (image.height() as f32 / sample_height).round() as u16;
 
         for y in 0..n_rows {
             let sample_start_y = (sample_height * y as f32).round() as u32;
