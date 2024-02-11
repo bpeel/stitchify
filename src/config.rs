@@ -32,6 +32,8 @@ struct Cli {
     #[arg(long, value_name = "COUNT", default_value_t = 30,
           value_parser = clap::value_parser!(u16).range(1..))]
     gauge_rows: u16,
+    #[arg(short, long)]
+    garter: bool,
 }
 
 #[derive(Clone)]
@@ -39,6 +41,7 @@ pub struct Dimensions {
     pub stitches: u16,
     pub gauge_stitches: u16,
     pub gauge_rows: u16,
+    pub duplicate_rows: u16,
 }
 
 pub struct Files {
@@ -59,10 +62,16 @@ impl Config {
             stitches,
             gauge_stitches,
             gauge_rows,
+            garter,
         } = Cli::parse();
 
         Config {
-            dimensions: Dimensions { stitches, gauge_stitches, gauge_rows },
+            dimensions: Dimensions {
+                stitches,
+                gauge_stitches,
+                gauge_rows,
+                duplicate_rows: garter as u16 + 1,
+            },
             files: Files { input, output },
         }
     }
