@@ -23,6 +23,22 @@ use std::fs::File;
 use image::DynamicImage;
 use image::buffer::ConvertBuffer;
 
+struct ImageBufWrapper(image::RgbImage);
+
+impl fabric::Image for ImageBufWrapper {
+    fn width(&self) -> u32 {
+        self.0.width()
+    }
+
+    fn height(&self) -> u32 {
+        self.0.height()
+    }
+
+    fn get_pixel(&self, x: u32, y: u32) -> fabric::Color {
+        self.0.get_pixel(x, y).0
+    }
+}
+
 fn main() -> ExitCode {
     let config = config::Config::parse();
 
@@ -59,7 +75,10 @@ fn main() -> ExitCode {
         },
     };
 
-    let fabric = fabric::Fabric::new(&image, &config.dimensions);
+    let fabric = fabric::Fabric::new(
+        &ImageBufWrapper(image),
+        &config.dimensions,
+    );
     let svg = fabric_svg::convert(&config.dimensions, &fabric);
 
     let output = match File::create(&config.files.output) {

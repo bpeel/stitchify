@@ -14,11 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use super::fabric::Fabric;
+use super::fabric::{Fabric, Color};
 use simple_xml_builder::XMLElement;
 use super::config::Dimensions;
 use std::fmt::Write;
-use image::Pixel;
 
 const BOX_WIDTH: u16 = 20;
 const LINE_WIDTH: f32 = BOX_WIDTH as f32 / 6.0;
@@ -28,7 +27,7 @@ fn generate_box(
     box_height: u16,
     x: u16,
     y: u16,
-    color: &image::Rgb<u8>,
+    color: Color,
 ) -> XMLElement {
     let mut path = XMLElement::new("path");
 
@@ -75,7 +74,7 @@ fn generate_boxes(
             box_height,
             x,
             y,
-            &stitch.color,
+            stitch.color,
         ));
     }
 
@@ -217,7 +216,7 @@ fn generate_box_thread_text(
     thread: u16,
     x: u16,
     y: u16,
-    color: &image::Rgb<u8>,
+    color: Color,
 ) -> XMLElement {
     let mut element = XMLElement::new("use");
 
@@ -228,7 +227,7 @@ fn generate_box_thread_text(
     element.add_attribute("x", x);
     element.add_attribute("y", y);
 
-    if color.channels().iter().map(|&x| x as u16).sum::<u16>() < 384 {
+    if color.iter().map(|&x| x as u16).sum::<u16>() < 384 {
         element.add_attribute("fill", "rgb(100%, 100%, 100%)");
     }
 
@@ -252,7 +251,7 @@ fn generate_box_threads(
             stitch.thread,
             x * box_width,
             y * box_height,
-            &stitch.color,
+            stitch.color,
         ));
     }
 
@@ -287,14 +286,14 @@ fn generate_thread_counts(
             box_height,
             0,
             y as u16,
-            &thread.color,
+            thread.color,
         ));
 
         group.add_child(generate_box_thread_text(
             thread.id,
             0,
             y as u16 * box_height,
-            &thread.color,
+            thread.color,
         ));
 
         let mut count_text = XMLElement::new("text");

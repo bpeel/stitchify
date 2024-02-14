@@ -14,13 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use image::{RgbImage, Rgb};
 use super::config::Dimensions;
 use std::collections::HashMap;
 
+pub type Color = [u8; 3];
+
+pub trait Image {
+    fn width(&self) -> u32;
+    fn height(&self) -> u32;
+    fn get_pixel(&self, x: u32, y: u32) -> Color;
+}
+
 #[derive(Clone)]
 pub struct Stitch {
-    pub color: Rgb<u8>,
+    pub color: Color,
     pub thread: u16,
 }
 
@@ -28,7 +35,7 @@ pub struct Thread {
     pub x: u16,
     pub y: u16,
     pub id: u16,
-    pub color: Rgb<u8>,
+    pub color: Color,
     pub stitch_count: u32,
 }
 
@@ -39,14 +46,14 @@ pub struct Fabric {
     threads: Vec<Thread>,
 }
 
-fn most_popular_color(
-    image: &RgbImage,
+fn most_popular_color<I: Image>(
+    image: &I,
     start_x: u32,
     end_x: u32,
     start_y: u32,
     end_y: u32,
-) -> Rgb<u8> {
-    let mut colors = HashMap::<Rgb<u8>, u32>::new();
+) -> Color {
+    let mut colors = HashMap::<Color, u32>::new();
 
     for y in start_y..end_y {
         for x in start_x..end_x {
@@ -57,12 +64,12 @@ fn most_popular_color(
         }
     }
 
-    colors.keys().max_by_key(|color| colors[color]).unwrap().clone()
+    colors.keys().max_by_key(|&color| colors[color]).unwrap().clone()
 }
 
 impl Fabric {
-    pub fn new(
-        image: &RgbImage,
+    pub fn new<I: Image>(
+        image: &I,
         dimensions: &Dimensions,
     ) -> Fabric {
         let mut stitches = Vec::new();
@@ -75,7 +82,7 @@ impl Fabric {
 
         stitches.resize(
             (n_rows * dimensions.stitches) as usize,
-            Stitch { color: Rgb::<u8>([0, 0, 0]), thread: 0 },
+            Stitch { color: [0, 0, 0], thread: 0 },
         );
 
         for y in (0..n_rows).rev().step_by(dimensions.duplicate_rows as usize) {
@@ -147,7 +154,7 @@ impl Fabric {
         self.threads.sort_unstable_by_key(|thread| thread.id);
     }
 
-    fn find_thread(&mut self, color: Rgb<u8>, x: u16, y: u16) -> &mut Thread {
+    fn find_thread(&mut self, color: Color, x: u16, y: u16) -> &mut Thread {
         for (i, thread) in self.threads.iter_mut().enumerate().rev() {
             if thread.y - y > 2 {
                 break;
