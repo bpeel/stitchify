@@ -19,12 +19,12 @@ use simple_xml_builder::XMLElement;
 use super::config::Dimensions;
 use std::fmt::Write;
 
-const BOX_WIDTH: u16 = 20;
-const LINE_WIDTH: f32 = BOX_WIDTH as f32 / 6.0;
+const BOX_WIDTH: f32 = 20.0;
+const LINE_WIDTH: f32 = BOX_WIDTH / 6.0;
 
 struct SvgGenerator<'a> {
-    box_width: u16,
-    box_height: u16,
+    box_width: f32,
+    box_height: f32,
     fabric: &'a Fabric,
 }
 
@@ -51,8 +51,8 @@ impl<'a> SvgGenerator<'a> {
             "d",
             format!(
                 "M {} {} l {} 0 l 0 {} l -{} 0 z",
-                x * self.box_width,
-                y * self.box_height,
+                x as f32 * self.box_width,
+                y as f32 * self.box_height,
                 self.box_width,
                 self.box_height,
                 self.box_width,
@@ -95,8 +95,8 @@ impl<'a> SvgGenerator<'a> {
             write!(
                 &mut path_str,
                 "M {} 0 l 0 {}",
-                x * self.box_width,
-                n_rows * self.box_height,
+                x as f32 * self.box_width,
+                n_rows as f32 * self.box_height,
             ).unwrap();
         }
 
@@ -108,8 +108,8 @@ impl<'a> SvgGenerator<'a> {
             write!(
                 &mut path_str,
                 "M 0 {} l {} 0",
-                y * self.box_height,
-                n_columns * self.box_width,
+                y as f32 * self.box_height,
+                n_columns as f32 * self.box_width,
             ).unwrap();
         }
 
@@ -132,17 +132,17 @@ impl<'a> SvgGenerator<'a> {
 
     fn set_text_appearance(&self, element: &mut XMLElement) {
         element.add_attribute("font-family", "Sans");
-        element.add_attribute("font-size", self.box_height as f32 * 0.6);
+        element.add_attribute("font-size", self.box_height * 0.6);
     }
 
     fn set_text_position(
         &self,
         text: &mut XMLElement,
-        x: u16,
-        y: u16,
+        x: f32,
+        y: f32,
     ) {
-        text.add_attribute("x", x as f32 + 0.5 * self.box_width as f32);
-        text.add_attribute("y", y as f32 + 0.7 * self.box_height as f32);
+        text.add_attribute("x", x + 0.5 * self.box_width);
+        text.add_attribute("y", y + 0.7 * self.box_height);
         text.add_attribute("text-anchor", "middle");
     }
 
@@ -158,8 +158,8 @@ impl<'a> SvgGenerator<'a> {
 
             self.set_text_position(
                 &mut text,
-                self.fabric.n_stitches() * self.box_width,
-                y * self.box_height,
+                self.fabric.n_stitches() as f32 * self.box_width,
+                y as f32 * self.box_height,
             );
 
             text.add_text(self.fabric.n_rows() - y);
@@ -172,8 +172,8 @@ impl<'a> SvgGenerator<'a> {
 
             self.set_text_position(
                 &mut text,
-                x * self.box_width,
-                self.fabric.n_rows() * self.box_height,
+                x as f32 * self.box_width,
+                self.fabric.n_rows() as f32 * self.box_height,
             );
 
             text.add_text(self.fabric.n_stitches() - x);
@@ -187,8 +187,8 @@ impl<'a> SvgGenerator<'a> {
     fn generate_box_thread_text(
         &self,
         thread: u16,
-        x: u16,
-        y: u16,
+        x: f32,
+        y: f32,
         color: Color,
     ) -> XMLElement {
         let mut element = XMLElement::new("use");
@@ -218,8 +218,8 @@ impl<'a> SvgGenerator<'a> {
 
             group.add_child(self.generate_box_thread_text(
                 stitch.thread,
-                x * self.box_width,
-                y * self.box_height,
+                x as f32 * self.box_width,
+                y as f32 * self.box_height,
                 stitch.color,
             ));
         }
@@ -237,7 +237,7 @@ impl<'a> SvgGenerator<'a> {
             format!(
                 "translate({} {})",
                 self.box_width,
-                self.box_height * (self.fabric.n_rows() + 2),
+                self.box_height * (self.fabric.n_rows() + 2) as f32,
             ),
         );
 
@@ -254,8 +254,8 @@ impl<'a> SvgGenerator<'a> {
 
             group.add_child(self.generate_box_thread_text(
                 thread.id,
-                0,
-                y as u16 * self.box_height,
+                0.0,
+                y as f32 * self.box_height,
                 thread.color,
             ));
 
@@ -263,7 +263,7 @@ impl<'a> SvgGenerator<'a> {
             self.set_text_position(
                 &mut count_text,
                 self.box_width,
-                y as u16 * self.box_height,
+                y as f32 * self.box_height,
             );
             count_text.add_text(format!("{}", thread.stitch_count));
             counts.add_child(count_text);
@@ -302,7 +302,7 @@ impl<'a> SvgGenerator<'a> {
             let mut element = XMLElement::new("text");
 
             self.set_text_appearance(&mut element);
-            self.set_text_position(&mut element, 0, 0);
+            self.set_text_position(&mut element, 0.0, 0.0);
 
             element.add_text(text);
             element.add_attribute("id", format!("thread-{}", thread.id));
@@ -318,17 +318,18 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
     let generator = SvgGenerator {
         box_width: BOX_WIDTH,
         box_height: BOX_WIDTH
-            * dimensions.gauge_stitches
-            / dimensions.gauge_rows,
+            * dimensions.gauge_stitches as f32
+            / dimensions.gauge_rows as f32,
         fabric,
     };
 
     let mut svg = XMLElement::new("svg");
 
-    let svg_width = ((fabric.n_stitches() + 1) * BOX_WIDTH) as f32
+    let svg_width = ((fabric.n_stitches() + 1) as f32 * BOX_WIDTH)
         + LINE_WIDTH / 2.0;
-    let svg_height = ((fabric.n_rows() + 2 + fabric.threads().len() as u16)
-                      * generator.box_height) as f32
+    let svg_height = ((fabric.n_rows() as usize + 2 + fabric.threads().len())
+                      as f32
+                      * generator.box_height)
         + LINE_WIDTH;
 
     svg.add_attribute("xmlns", "http://www.w3.org/2000/svg");
