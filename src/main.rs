@@ -26,6 +26,61 @@ use std::fs::File;
 use image::DynamicImage;
 use image::buffer::ConvertBuffer;
 use stitch_image::{Color, Image};
+use simple_xml_builder::XMLElement;
+
+struct DocumentWrapper {
+}
+
+struct ElementWrapper {
+    inner: XMLElement,
+}
+
+impl fabric_svg::Document for DocumentWrapper {
+    type Element = ElementWrapper;
+
+    fn create_element(&self, name: &str) -> ElementWrapper {
+        ElementWrapper {
+            inner: XMLElement::new(name),
+        }
+    }
+}
+
+impl fabric_svg::Element for ElementWrapper {
+    fn set_root_namespace(&mut self, namespace: &str) {
+        self.inner.add_attribute("xmlns", namespace);
+    }
+
+    fn add_namespace(&mut self, keyword: &str, namespace: &str) {
+        self.inner.add_attribute(
+            format!("xmlns:{}", keyword.to_string()),
+            namespace.to_string(),
+        );
+    }
+
+    fn add_child(&mut self, child: ElementWrapper) {
+        self.inner.add_child(child.inner);
+    }
+
+    fn add_text(&mut self, value: impl ToString) {
+        self.inner.add_text(value);
+    }
+
+    fn add_attribute(&mut self, name: &str, value: impl ToString) {
+        self.inner.add_attribute(name, value);
+    }
+
+    fn add_attribute_ns(
+        &mut self,
+        keyword: &str,
+        name: &str,
+        value: impl ToString
+    ) {
+        self.inner.add_attribute(
+            format!("{}:{}", keyword, name),
+            value,
+        );
+    }
+}
 
 struct ImageBufWrapper(image::RgbaImage);
 
@@ -52,19 +107,24 @@ impl Image for ImageBufWrapper {
 fn build_svg<I: Image>(
     image: &I,
     config: &config::Config,
-) -> Result<simple_xml_builder::XMLElement, fabric::Error> {
+) -> Result<XMLElement, fabric::Error> {
     if config.mitre {
         let (fabric, dimensions) = mitre::make_mitre_fabric(
             image,
             &config.dimensions,
         )?;
 
-        Ok(fabric_svg::convert(&dimensions, &fabric))
+        Ok(fabric_svg::convert(
+            &DocumentWrapper { },
+            &dimensions,
+            &fabric,
+        ).inner)
     } else {
         Ok(fabric_svg::convert(
+            &DocumentWrapper { },
             &config.dimensions,
             &fabric::Fabric::new(image, &config.dimensions)?,
-        ))
+        ).inner)
     }
 }
 

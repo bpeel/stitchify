@@ -16,7 +16,6 @@
 
 use super::fabric::{Fabric, Thread};
 use super::stitch_image::Color;
-use simple_xml_builder::XMLElement;
 use super::config::Dimensions;
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -25,21 +24,42 @@ use std::fmt;
 const BOX_WIDTH: f32 = 20.0;
 const LINE_WIDTH: f32 = BOX_WIDTH / 6.0;
 
-struct SvgGenerator<'a> {
+pub trait Document {
+    type Element: Element;
+
+    fn create_element(&self, name: &str) -> Self::Element;
+}
+
+pub trait Element {
+    fn set_root_namespace(&mut self, namespace: &str);
+    fn add_namespace(&mut self, keyword: &str, namespace: &str);
+    fn add_child(&mut self, child: Self);
+    fn add_text(&mut self, value: impl ToString);
+    fn add_attribute(&mut self, name: &str, value: impl ToString);
+    fn add_attribute_ns(
+        &mut self,
+        keyword: &str,
+        name: &str,
+        value: impl ToString
+    );
+}
+
+struct SvgGenerator<'a, D: Document> {
     box_width: f32,
     box_height: f32,
     fabric: &'a Fabric,
     dimensions: &'a Dimensions,
+    document: &'a D,
 }
 
-impl<'a> SvgGenerator<'a> {
+impl<'a, D: Document> SvgGenerator<'a, D> {
     fn generate_box(
         &self,
         x: u16,
         y: u16,
         color: Color,
-    ) -> XMLElement {
-        let mut path = XMLElement::new("path");
+    ) -> D::Element {
+        let mut path = self.document.create_element("path");
 
         path.add_attribute(
             "fill",
@@ -66,8 +86,8 @@ impl<'a> SvgGenerator<'a> {
         path
     }
 
-    fn generate_boxes(&self) -> XMLElement {
-        let mut group = XMLElement::new("g");
+    fn generate_boxes(&self) -> D::Element {
+        let mut group = self.document.create_element("g");
 
         group.add_attribute("id", "boxes");
 
@@ -83,8 +103,8 @@ impl<'a> SvgGenerator<'a> {
         group
     }
 
-    fn generate_grid_no_id(&self, n_columns: u16, n_rows: u16) -> XMLElement {
-        let mut path = XMLElement::new("path");
+    fn generate_grid_no_id(&self, n_columns: u16, n_rows: u16) -> D::Element {
+        let mut path = self.document.create_element("path");
 
         path.add_attribute("stroke-width", LINE_WIDTH);
         path.add_attribute("stroke-linecap", "square");
@@ -124,7 +144,7 @@ impl<'a> SvgGenerator<'a> {
         path
     }
 
-    fn generate_grid(&self) -> XMLElement {
+    fn generate_grid(&self) -> D::Element {
         let fabric = self.fabric;
         let mut path = self.generate_grid_no_id(
             fabric.n_stitches(),
@@ -136,18 +156,18 @@ impl<'a> SvgGenerator<'a> {
         path
     }
 
-    fn set_text_appearance(&self, element: &mut XMLElement) {
+    fn set_text_appearance(&self, element: &mut D::Element) {
         element.add_attribute("font-family", "Sans");
         element.add_attribute("font-size", self.box_height * 0.6);
     }
 
-    fn set_text_y(&self, text: &mut XMLElement, y: f32) {
+    fn set_text_y(&self, text: &mut D::Element, y: f32) {
         text.add_attribute("y", y + 0.7 * self.box_height);
     }
 
     fn set_text_position(
         &self,
-        text: &mut XMLElement,
+        text: &mut D::Element,
         x: f32,
         y: f32,
     ) {
@@ -156,19 +176,19 @@ impl<'a> SvgGenerator<'a> {
         text.add_attribute("text-anchor", "middle");
     }
 
-    fn generate_rulers(&self) -> XMLElement {
-        let mut group = XMLElement::new("g");
+    fn generate_rulers(&self) -> D::Element {
+        let mut group = self.document.create_element("g");
 
         group.add_attribute("id", "rulers");
 
         self.set_text_appearance(&mut group);
 
-        let mut left_rulers = XMLElement::new("g");
+        let mut left_rulers = self.document.create_element("g");
 
         left_rulers.add_attribute("id", "left-rulers");
 
         for y in 0..self.fabric.n_rows() {
-            let mut text = XMLElement::new("text");
+            let mut text = self.document.create_element("text");
 
             self.set_text_position(
                 &mut text,
@@ -183,7 +203,7 @@ impl<'a> SvgGenerator<'a> {
 
         group.add_child(left_rulers);
 
-        let mut right_rulers = XMLElement::new("use");
+        let mut right_rulers = self.document.create_element("use");
         right_rulers.add_attribute("xlink:href", "#left-rulers");
         right_rulers.add_attribute(
             "x",
@@ -192,12 +212,12 @@ impl<'a> SvgGenerator<'a> {
 
         group.add_child(right_rulers);
 
-        let mut top_rulers = XMLElement::new("g");
+        let mut top_rulers = self.document.create_element("g");
 
         top_rulers.add_attribute("id", "top-rulers");
 
         for x in 0..self.fabric.n_stitches() {
-            let mut text = XMLElement::new("text");
+            let mut text = self.document.create_element("text");
 
             self.set_text_position(
                 &mut text,
@@ -212,7 +232,7 @@ impl<'a> SvgGenerator<'a> {
 
         group.add_child(top_rulers);
 
-        let mut bottom_rulers = XMLElement::new("use");
+        let mut bottom_rulers = self.document.create_element("use");
         bottom_rulers.add_attribute("xlink:href", "#top-rulers");
         bottom_rulers.add_attribute(
             "y",
@@ -224,8 +244,8 @@ impl<'a> SvgGenerator<'a> {
         group
     }
 
-    fn generate_missing_stitches(&self) -> XMLElement {
-        let mut group = XMLElement::new("g");
+    fn generate_missing_stitches(&self) -> D::Element {
+        let mut group = self.document.create_element("g");
 
         group.add_attribute("id", "missing-stitches");
 
@@ -234,7 +254,7 @@ impl<'a> SvgGenerator<'a> {
                 let x = stitch_num as u16 % self.fabric.n_stitches();
                 let y = stitch_num as u16 / self.fabric.n_stitches();
 
-                let mut path = XMLElement::new("path");
+                let mut path = self.document.create_element("path");
 
                 path.add_attribute("stroke-width", LINE_WIDTH / 2.0);
                 path.add_attribute("stroke", "rgb(71%, 71%, 71%)");
@@ -267,11 +287,12 @@ impl<'a> SvgGenerator<'a> {
         x: f32,
         y: f32,
         color: Color,
-    ) -> XMLElement {
-        let mut element = XMLElement::new("use");
+    ) -> D::Element {
+        let mut element = self.document.create_element("use");
 
-        element.add_attribute(
-            "xlink:href",
+        element.add_attribute_ns(
+            "xlink",
+            "href",
             format!("#thread-{}", thread)
         );
         element.add_attribute("x", x);
@@ -284,8 +305,8 @@ impl<'a> SvgGenerator<'a> {
         element
     }
 
-    fn generate_box_threads(&self) -> XMLElement {
-        let mut group = XMLElement::new("g");
+    fn generate_box_threads(&self) -> D::Element {
+        let mut group = self.document.create_element("g");
 
         group.add_attribute("id", "box-threads");
 
@@ -306,8 +327,8 @@ impl<'a> SvgGenerator<'a> {
         group
     }
 
-    fn generate_stitch_count(&self, y: usize, count: u32) -> XMLElement {
-        let mut count_text = XMLElement::new("text");
+    fn generate_stitch_count(&self, y: usize, count: u32) -> D::Element {
+        let mut count_text = self.document.create_element("text");
         count_text.add_attribute("x", self.box_width as f32 * 1.5);
         self.set_text_y(&mut count_text, y as f32 * self.box_height);
 
@@ -318,8 +339,8 @@ impl<'a> SvgGenerator<'a> {
         count_text
     }
 
-    fn generate_thread_counts(&self ) -> XMLElement {
-        let mut group = XMLElement::new("g");
+    fn generate_thread_counts(&self) -> D::Element {
+        let mut group = self.document.create_element("g");
 
         group.add_attribute("id", "thread-counts");
 
@@ -332,7 +353,7 @@ impl<'a> SvgGenerator<'a> {
             ),
         );
 
-        let mut counts = XMLElement::new("g");
+        let mut counts = self.document.create_element("g");
 
         self.set_text_appearance(&mut counts);
 
@@ -366,8 +387,8 @@ impl<'a> SvgGenerator<'a> {
         group
     }
 
-    fn generate_color_counts(&self) -> XMLElement {
-        let mut group = XMLElement::new("g");
+    fn generate_color_counts(&self) -> D::Element {
+        let mut group = self.document.create_element("g");
 
         group.add_attribute("id", "color-counts");
 
@@ -380,7 +401,7 @@ impl<'a> SvgGenerator<'a> {
             ),
         );
 
-        let mut text_group = XMLElement::new("g");
+        let mut text_group = self.document.create_element("g");
 
         self.set_text_appearance(&mut text_group);
 
@@ -406,8 +427,8 @@ impl<'a> SvgGenerator<'a> {
         group
     }
 
-    fn generate_defs(&self) -> XMLElement {
-        let mut defs = XMLElement::new("defs");
+    fn generate_defs(&self) -> D::Element {
+        let mut defs = self.document.create_element("defs");
 
         for thread in self.fabric.threads().iter() {
             let text = if thread.id == 0 {
@@ -426,7 +447,7 @@ impl<'a> SvgGenerator<'a> {
                 parts.iter().rev().collect::<String>()
             };
 
-            let mut element = XMLElement::new("text");
+            let mut element = self.document.create_element("text");
 
             self.set_text_appearance(&mut element);
             self.set_text_position(&mut element, 0.0, 0.0);
@@ -441,7 +462,11 @@ impl<'a> SvgGenerator<'a> {
     }
 }
 
-pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
+pub fn convert<D: Document>(
+    document: &D,
+    dimensions: &Dimensions,
+    fabric: &Fabric
+) -> D::Element {
     let generator = SvgGenerator {
         dimensions: dimensions,
         box_width: BOX_WIDTH,
@@ -449,9 +474,8 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
             * dimensions.gauge_stitches as f32
             / dimensions.gauge_rows as f32,
         fabric,
+        document,
     };
-
-    let mut svg = XMLElement::new("svg");
 
     let svg_width = (fabric.n_stitches() + 2) as f32 * BOX_WIDTH;
     let svg_height = ((fabric.n_rows() as usize + 3 + fabric.threads().len())
@@ -459,8 +483,10 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
                       * generator.box_height)
         + LINE_WIDTH / 2.0;
 
-    svg.add_attribute("xmlns", "http://www.w3.org/2000/svg");
-    svg.add_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+    let mut svg = document.create_element("svg");
+
+    svg.set_root_namespace("http://www.w3.org/2000/svg");
+    svg.add_namespace("xlink", "http://www.w3.org/1999/xlink");
     svg.add_attribute("width", svg_width);
     svg.add_attribute("height", svg_height);
     svg.add_attribute(
