@@ -75,10 +75,17 @@ fn main() -> ExitCode {
         },
     };
 
-    let fabric = fabric::Fabric::new(
+    let fabric = match fabric::Fabric::new(
         &ImageBufWrapper(image),
         &config.dimensions,
-    );
+    ) {
+        Ok(fabric) => fabric,
+        Err(e) => {
+            eprintln!("{}", e);
+            return ExitCode::FAILURE;
+        },
+    };
+
     let svg = fabric_svg::convert(&config.dimensions, &fabric);
 
     let output = match File::create(&config.files.output) {

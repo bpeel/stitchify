@@ -14,8 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use super::config::Dimensions;
+use super::config::{Dimensions, Link};
 use std::collections::HashMap;
+use std::fmt;
+
+const MAX_ROW_GAP: u16 = 2;
+const MAX_STITCH_GAP: u16 = 1;
 
 pub type Color = [u8; 3];
 
@@ -46,6 +50,33 @@ pub struct Fabric {
     threads: Vec<Thread>,
 }
 
+#[derive(Debug)]
+pub enum Error {
+    LinkNotFound(Link),
+    LinkTooFar(Link),
+    LinkToDifferentColor(Link),
+    PosOutsideOfFabric(u16, u16),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::LinkNotFound(link) => {
+                write!(f, "No thread found for link {}", link)
+            },
+            Error::LinkTooFar(link) => {
+                write!(f, "Link is too far: {}", link)
+            },
+            Error::LinkToDifferentColor(link) => {
+                write!(f, "Colors don’t match for link: {}", link)
+            },
+            Error::PosOutsideOfFabric(x, y) => {
+                write!(f, "Position {},{} is outside of the fabric", x, y)
+            },
+        }
+    }
+}
+
 fn most_popular_color<I: Image>(
     image: &I,
     start_x: u32,
@@ -71,7 +102,7 @@ impl Fabric {
     pub fn new<I: Image>(
         image: &I,
         dimensions: &Dimensions,
-    ) -> Fabric {
+    ) -> Result<Fabric, Error> {
         let mut stitches = Vec::new();
 
         let sample_width = image.width() as f32 / dimensions.stitches as f32;
@@ -129,12 +160,52 @@ impl Fabric {
             threads: Vec::new(),
         };
 
-        fabric.calculate_threads();
+        fabric.validate_links(dimensions)?;
+        fabric.calculate_threads(dimensions)?;
 
-        fabric
+        Ok(fabric)
     }
 
-    fn calculate_threads(&mut self) {
+    fn validate_link_pos(&self, x: u16, y: u16) -> Result<(), Error> {
+        if x == 0 || x > self.n_stitches || y == 0 || y > self.n_rows {
+            Err(Error::PosOutsideOfFabric(x, y))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn look_up_link_position(&self, x: u16, y: u16) -> &Stitch {
+        &self.stitches[
+            (self.n_stitches - x
+             + (self.n_rows - y) * self.n_stitches) as usize
+        ]
+    }
+
+    fn validate_links(&self, dimensions: &Dimensions) -> Result<(), Error> {
+        for link in dimensions.links.iter() {
+            self.validate_link_pos(link.source_x, link.source_y)?;
+            self.validate_link_pos(link.dest_x, link.dest_y)?;
+
+            if link.source_x.abs_diff(link.dest_x) > MAX_STITCH_GAP
+                || link.source_y.abs_diff(link.dest_y) > MAX_ROW_GAP
+            {
+                return Err(Error::LinkTooFar(link.clone()));
+            }
+
+            if self.look_up_link_position(link.source_x, link.source_y).color
+                != self.look_up_link_position(link.dest_x, link.dest_y).color
+            {
+                return Err(Error::LinkToDifferentColor(link.clone()));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn calculate_threads(
+        &mut self,
+        dimensions: &Dimensions,
+    ) -> Result<(), Error> {
         for y in (0..self.n_rows).rev() {
             for mut x in 0..self.n_stitches {
                 if (self.n_rows - 1 - y) & 1 == 0 {
@@ -142,8 +213,13 @@ impl Fabric {
                 }
 
                 let stitch_pos = (x + y * self.n_stitches) as usize;
-                let color = self.stitches[stitch_pos].color.clone();
-                let thread = self.find_thread(color, x, y);
+
+                let thread = self.find_thread(
+                    dimensions,
+                    self.stitches[stitch_pos].color.clone(),
+                    x,
+                    y
+                )?;
 
                 thread.stitch_count += 1;
 
@@ -152,11 +228,43 @@ impl Fabric {
         }
 
         self.threads.sort_unstable_by_key(|thread| thread.id);
+
+        Ok(())
     }
 
-    fn find_thread(&mut self, color: Color, x: u16, y: u16) -> &mut Thread {
-        for (i, thread) in self.threads.iter_mut().enumerate().rev() {
-            if thread.y - y > 2 {
+    fn find_thread_in_links(
+        &self,
+        dimensions: &Dimensions,
+        x: u16,
+        y: u16,
+    ) -> Result<Option<usize>, Error> {
+        for link in dimensions.links.iter() {
+            if self.n_stitches - link.source_x == x
+                && self.n_rows - link.source_y == y
+            {
+                for (i, thread) in self.threads.iter().enumerate() {
+                    if thread.x == self.n_stitches - link.dest_x
+                        && thread.y == self.n_rows - link.dest_y
+                    {
+                        return Ok(Some(i));
+                    }
+                }
+
+                return Err(Error::LinkNotFound(link.clone()));
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn find_neighboring_thread(
+        &self,
+        color: Color,
+        x: u16,
+        y: u16,
+    ) -> Option<usize> {
+        for (i, thread) in self.threads.iter().enumerate().rev() {
+            if thread.y - y > MAX_ROW_GAP {
                 break;
             }
 
@@ -164,26 +272,42 @@ impl Fabric {
                 continue;
             }
 
-            if thread.x.abs_diff(x) < 2 {
-                let mut thread = self.threads.remove(i);
-                thread.x = x;
-                thread.y = y;
-                self.threads.push(thread);
-                return self.threads.last_mut().unwrap();
+            if thread.x.abs_diff(x) <= MAX_STITCH_GAP {
+                return Some(i);
             }
         }
 
-        let id = self.threads.len() as u16;
+        None
+    }
 
-        self.threads.push(Thread {
-            x,
-            y,
-            id,
-            color: color.clone(),
-            stitch_count: 0,
-        });
+    fn find_thread(
+        &mut self,
+        dimensions: &Dimensions,
+        color: Color,
+        x: u16,
+        y: u16,
+    ) -> Result<&mut Thread, Error> {
+        if let Some(thread_index) =
+            self.find_thread_in_links(dimensions, x, y)?
+            .or_else(|| self.find_neighboring_thread(color, x, y))
+        {
+            let mut thread = self.threads.remove(thread_index);
+            thread.x = x;
+            thread.y = y;
+            self.threads.push(thread);
+        } else {
+            let id = self.threads.len() as u16;
 
-        return self.threads.last_mut().unwrap();
+            self.threads.push(Thread {
+                x,
+                y,
+                id,
+                color: color.clone(),
+                stitch_count: 0,
+            });
+        }
+
+        return Ok(self.threads.last_mut().unwrap());
     }
 
     pub fn threads(&self) -> &[Thread] {
