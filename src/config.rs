@@ -15,8 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use clap::Parser;
-use std::str::FromStr;
-use std::fmt;
+use super::dimensions::{Dimensions, Link};
 
 #[derive(Parser)]
 #[command(name = "Stitchify")]
@@ -45,108 +44,6 @@ struct Cli {
     #[arg(short, long = "link", value_name = "LINK",
           value_parser = clap::value_parser!(Link))]
     links: Vec<Link>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Link {
-    pub source: (u16, u16),
-    pub dest: (u16, u16),
-}
-
-#[derive(Debug)]
-pub enum LinkParseError {
-    MissingElement,
-    TooManyElements,
-    ParseIntError(std::num::ParseIntError),
-}
-
-impl From<std::num::ParseIntError> for LinkParseError {
-    fn from(e: std::num::ParseIntError) -> LinkParseError {
-        LinkParseError::ParseIntError(e)
-    }
-}
-
-impl std::error::Error for LinkParseError {
-}
-
-impl fmt::Display for LinkParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match self {
-            LinkParseError::ParseIntError(e) => write!(f, "{}", e),
-            LinkParseError::MissingElement
-                | LinkParseError::TooManyElements =>
-            {
-                write!(f, "Link argument must be of the form “x,y,x,y”")
-            },
-        }
-    }
-}
-
-impl FromStr for Link {
-    type Err = LinkParseError;
-
-    fn from_str(s: &str) -> Result<Link, LinkParseError> {
-        let mut value_count = 0usize;
-        let mut link = Link { source: (0, 0), dest: (0, 0) };
-
-        for part in s.split(',') {
-            let part = part.parse::<u16>()?;
-
-            match value_count {
-                0 => link.source.0 = part,
-                1 => link.source.1 = part,
-                2 => link.dest.0 = part,
-                3 => link.dest.1 = part,
-                _ => return Err(LinkParseError::TooManyElements),
-            }
-
-            value_count += 1;
-        }
-
-        if value_count < 4 {
-            Err(LinkParseError::MissingElement)
-        } else {
-            Ok(link)
-        }
-    }
-}
-
-impl fmt::Display for Link {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{},{}->{},{}",
-            self.source.0,
-            self.source.1,
-            self.dest.0,
-            self.dest.1,
-        )
-    }
-}
-
-#[derive(Clone)]
-pub struct Dimensions {
-    pub stitches: u16,
-    pub gauge_stitches: u16,
-    pub gauge_rows: u16,
-    pub cm_per_stitch: Option<f32>,
-    pub duplicate_rows: u16,
-    pub allow_link_gaps: bool,
-    pub links: Vec<Link>,
-}
-
-impl Default for Dimensions {
-    fn default() -> Dimensions {
-        Dimensions {
-            stitches: 22,
-            gauge_stitches: 22,
-            gauge_rows: 30,
-            cm_per_stitch: None,
-            duplicate_rows: 1,
-            allow_link_gaps: false,
-            links: Vec::new(),
-        }
-    }
 }
 
 pub struct Files {

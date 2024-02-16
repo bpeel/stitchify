@@ -16,7 +16,7 @@
 
 use super::fabric::{Fabric, Thread};
 use super::stitch_image::Color;
-use super::config::Dimensions;
+use super::dimensions::Dimensions;
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::fmt;

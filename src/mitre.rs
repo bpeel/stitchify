@@ -16,7 +16,7 @@
 
 use super::fabric::{self, Fabric};
 use super::stitch_image::{Image, Color};
-use super::config::{Dimensions, Link};
+use super::dimensions::{Dimensions, Link};
 use super::sampler::Sampler;
 
 struct MitreImage {
