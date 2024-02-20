@@ -18,6 +18,7 @@ use super::fabric::{Fabric, Color};
 use simple_xml_builder::XMLElement;
 use super::config::Dimensions;
 use std::fmt::Write;
+use std::fmt;
 
 const BOX_WIDTH: f32 = 20.0;
 const LINE_WIDTH: f32 = BOX_WIDTH / 6.0;
@@ -26,6 +27,7 @@ struct SvgGenerator<'a> {
     box_width: f32,
     box_height: f32,
     fabric: &'a Fabric,
+    dimensions: &'a Dimensions,
 }
 
 impl<'a> SvgGenerator<'a> {
@@ -135,6 +137,10 @@ impl<'a> SvgGenerator<'a> {
         element.add_attribute("font-size", self.box_height * 0.6);
     }
 
+    fn set_text_y(&self, text: &mut XMLElement, y: f32) {
+        text.add_attribute("y", y + 0.7 * self.box_height);
+    }
+
     fn set_text_position(
         &self,
         text: &mut XMLElement,
@@ -142,7 +148,7 @@ impl<'a> SvgGenerator<'a> {
         y: f32,
     ) {
         text.add_attribute("x", x + 0.5 * self.box_width);
-        text.add_attribute("y", y + 0.7 * self.box_height);
+        self.set_text_y(text, y);
         text.add_attribute("text-anchor", "middle");
     }
 
@@ -260,12 +266,12 @@ impl<'a> SvgGenerator<'a> {
             ));
 
             let mut count_text = XMLElement::new("text");
-            self.set_text_position(
-                &mut count_text,
-                self.box_width,
-                y as f32 * self.box_height,
+            count_text.add_attribute("x", self.box_width as f32 * 1.5);
+            self.set_text_y(&mut count_text, y as f32 * self.box_height);
+
+            count_text.add_text(
+                stitch_count_text(&self.dimensions, thread.stitch_count)
             );
-            count_text.add_text(format!("{}", thread.stitch_count));
             counts.add_child(count_text);
         }
 
@@ -316,6 +322,7 @@ impl<'a> SvgGenerator<'a> {
 
 pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
     let generator = SvgGenerator {
+        dimensions: dimensions,
         box_width: BOX_WIDTH,
         box_height: BOX_WIDTH
             * dimensions.gauge_stitches as f32
@@ -359,4 +366,101 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
     svg.add_child(translation);
 
     svg
+}
+
+fn mm_to_text(mut out: impl Write, mm: u32) -> fmt::Result {
+    if mm < 10 {
+        write!(out, "{}mm", mm)?;
+    } else {
+        let cm = (mm + 5) / 10;
+
+        if cm < 100 {
+            write!(out, "{}cm", cm)?;
+        } else {
+            write!(out, "{}", cm / 100)?;
+
+            let mut rem_cm = cm % 100;
+
+            if rem_cm > 0 {
+                out.write_char('.')?;
+
+                while rem_cm > 0 {
+                    write!(out, "{}", rem_cm / 10)?;
+                    rem_cm = rem_cm * 10 % 100;
+                }
+            }
+
+            out.write_char('m')?;
+        }
+    }
+
+    Ok(())
+}
+
+fn stitch_count_text(dimensions: &Dimensions, n_stitches: u32) -> String {
+    let mut count = format!("{} (", n_stitches);
+
+    // Multiply by 100 because the gauge is probably in stitches per
+    // 10cm. Multiply by 3 because there is a rule of thumb that it
+    // takes approximately 3 times as much yarn to make the stitch
+    // than the resulting width of the stitch. Add half of the gauge
+    // to round to the nearest integer instead of rounding down.
+    let mm = (n_stitches * 100 * 3 + dimensions.gauge_stitches as u32 / 2)
+        / dimensions.gauge_stitches as u32;
+
+    mm_to_text(&mut count, mm).unwrap();
+
+    count.push(')');
+
+    count
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn mm_to_string(mm: u32) -> String {
+        let mut result = String::new();
+
+        mm_to_text(&mut result, mm).unwrap();
+
+        result
+    }
+
+    #[test]
+    fn test_mm_to_text() {
+        assert_eq!(&mm_to_string(1), "1mm");
+        assert_eq!(&mm_to_string(9), "9mm");
+        assert_eq!(&mm_to_string(10), "1cm");
+        assert_eq!(&mm_to_string(11), "1cm");
+        assert_eq!(&mm_to_string(15), "2cm");
+        assert_eq!(&mm_to_string(19), "2cm");
+        assert_eq!(&mm_to_string(994), "99cm");
+        assert_eq!(&mm_to_string(995), "1m");
+        assert_eq!(&mm_to_string(1000), "1m");
+        assert_eq!(&mm_to_string(1100), "1.1m");
+        assert_eq!(&mm_to_string(1120), "1.12m");
+        assert_eq!(&mm_to_string(1126), "1.13m");
+    }
+
+    #[test]
+    fn test_stitch_count_text() {
+        let dimensions = Dimensions {
+            stitches: 30,
+            gauge_stitches: 31,
+            gauge_rows: 57,
+            duplicate_rows: 1,
+            links: Vec::new(),
+        };
+
+        assert_eq!(
+            &stitch_count_text(&dimensions, 31),
+            "31 (30cm)"
+        );
+
+        assert_eq!(
+            &stitch_count_text(&dimensions, 46),
+            "46 (45cm)"
+        );
+    }
 }

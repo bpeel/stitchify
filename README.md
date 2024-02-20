@@ -18,7 +18,7 @@ You can specify the number of stitches that you want to cast on with the `-s` op
 
 ## Gauge
 
-If you want the image to be more precise you can specify your knitting gauge using the `--gauge-stitches` and `--gauge-rows` options. This would usually be the number stitches and rows in a 10cm×10cm square. The gauge is only used to calculate the aspect ratio of the box representing a stitch so in practice it doesn’t really matter what units you use for it.
+If you want the image to be more precise you can specify your knitting gauge using the `--gauge-stitches` and `--gauge-rows` options. This would usually be the number stitches and rows in a 10cm×10cm square. The gauge is used to calculate the aspect ratio of the box representing a stitch and the approximate length of yarn needed for each bobbin.
 
 ## Garter stitch
 
