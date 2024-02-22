@@ -400,13 +400,21 @@ fn mm_to_text(mut out: impl Write, mm: u32) -> fmt::Result {
 fn stitch_count_text(dimensions: &Dimensions, n_stitches: u32) -> String {
     let mut count = format!("{} (", n_stitches);
 
-    // Multiply by 100 because the gauge is probably in stitches per
-    // 10cm. Multiply by 3 because there is a rule of thumb that it
-    // takes approximately 3 times as much yarn to make the stitch
-    // than the resulting width of the stitch. Add half of the gauge
-    // to round to the nearest integer instead of rounding down.
-    let mm = (n_stitches * 100 * 3 + dimensions.gauge_stitches as u32 / 2)
-        / dimensions.gauge_stitches as u32;
+    let mm = match dimensions.cm_per_stitch {
+        Some(cm_per_stitch) => {
+            (n_stitches as f32 * cm_per_stitch * 10.0).round() as u32
+        },
+        None => {
+            // Multiply by 100 because the gauge is probably in
+            // stitches per 10cm. Multiply by 3 because there is a
+            // rule of thumb that it takes approximately 3 times as
+            // much yarn to make the stitch than the resulting width
+            // of the stitch. Add half of the gauge to round to the
+            // nearest integer instead of rounding down.
+            (n_stitches * 100 * 3 + dimensions.gauge_stitches as u32 / 2)
+                / dimensions.gauge_stitches as u32
+        },
+    };
 
     mm_to_text(&mut count, mm).unwrap();
 
@@ -445,10 +453,11 @@ mod test {
 
     #[test]
     fn test_stitch_count_text() {
-        let dimensions = Dimensions {
+        let mut dimensions = Dimensions {
             stitches: 30,
             gauge_stitches: 31,
             gauge_rows: 57,
+            cm_per_stitch: None,
             duplicate_rows: 1,
             links: Vec::new(),
         };
@@ -461,6 +470,13 @@ mod test {
         assert_eq!(
             &stitch_count_text(&dimensions, 46),
             "46 (45cm)"
+        );
+
+        dimensions.cm_per_stitch = Some(100.0);
+
+        assert_eq!(
+            &stitch_count_text(&dimensions, 345),
+            "345 (345m)",
         );
     }
 }

@@ -34,6 +34,8 @@ struct Cli {
     #[arg(long, value_name = "COUNT", default_value_t = 30,
           value_parser = clap::value_parser!(u16).range(1..))]
     gauge_rows: u16,
+    #[arg(long, value_name = "CM")]
+    cm_per_stitch: Option<f32>,
     #[arg(short, long)]
     garter: bool,
     #[arg(short, long = "link", value_name = "LINK",
@@ -125,6 +127,7 @@ pub struct Dimensions {
     pub stitches: u16,
     pub gauge_stitches: u16,
     pub gauge_rows: u16,
+    pub cm_per_stitch: Option<f32>,
     pub duplicate_rows: u16,
     pub links: Vec<Link>,
 }
@@ -147,6 +150,7 @@ impl Config {
             stitches,
             gauge_stitches,
             gauge_rows,
+            cm_per_stitch,
             garter,
             links,
         } = Cli::parse();
@@ -156,6 +160,7 @@ impl Config {
                 stitches,
                 gauge_stitches,
                 gauge_rows,
+                cm_per_stitch,
                 duplicate_rows: garter as u16 + 1,
                 links,
             },
