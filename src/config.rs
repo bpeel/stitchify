@@ -45,10 +45,8 @@ struct Cli {
 
 #[derive(Clone, Debug)]
 pub struct Link {
-    pub source_x: u16,
-    pub source_y: u16,
-    pub dest_x: u16,
-    pub dest_y: u16,
+    pub source: (u16, u16),
+    pub dest: (u16, u16),
 }
 
 #[derive(Debug)]
@@ -85,16 +83,16 @@ impl FromStr for Link {
 
     fn from_str(s: &str) -> Result<Link, LinkParseError> {
         let mut value_count = 0usize;
-        let mut link = Link { source_x: 0, source_y: 0, dest_x: 0, dest_y: 0 };
+        let mut link = Link { source: (0, 0), dest: (0, 0) };
 
         for part in s.split(',') {
             let part = part.parse::<u16>()?;
 
             match value_count {
-                0 => link.source_x = part,
-                1 => link.source_y = part,
-                2 => link.dest_x = part,
-                3 => link.dest_y = part,
+                0 => link.source.0 = part,
+                1 => link.source.1 = part,
+                2 => link.dest.0 = part,
+                3 => link.dest.1 = part,
                 _ => return Err(LinkParseError::TooManyElements),
             }
 
@@ -114,10 +112,10 @@ impl fmt::Display for Link {
         write!(
             f,
             "{},{}->{},{}",
-            self.source_x,
-            self.source_y,
-            self.dest_x,
-            self.dest_y,
+            self.source.0,
+            self.source.1,
+            self.dest.0,
+            self.dest.1,
         )
     }
 }

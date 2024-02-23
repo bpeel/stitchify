@@ -166,7 +166,7 @@ impl Fabric {
         Ok(fabric)
     }
 
-    fn validate_link_pos(&self, x: u16, y: u16) -> Result<(), Error> {
+    fn validate_link_pos(&self, (x, y): (u16, u16)) -> Result<(), Error> {
         if x == 0 || x > self.n_stitches || y == 0 || y > self.n_rows {
             Err(Error::PosOutsideOfFabric(x, y))
         } else {
@@ -174,7 +174,7 @@ impl Fabric {
         }
     }
 
-    fn look_up_link_position(&self, x: u16, y: u16) -> &Stitch {
+    fn look_up_link_position(&self, (x, y): (u16, u16)) -> &Stitch {
         &self.stitches[
             (self.n_stitches - x
              + (self.n_rows - y) * self.n_stitches) as usize
@@ -183,17 +183,17 @@ impl Fabric {
 
     fn validate_links(&self, dimensions: &Dimensions) -> Result<(), Error> {
         for link in dimensions.links.iter() {
-            self.validate_link_pos(link.source_x, link.source_y)?;
-            self.validate_link_pos(link.dest_x, link.dest_y)?;
+            self.validate_link_pos(link.source)?;
+            self.validate_link_pos(link.dest)?;
 
-            if link.source_x.abs_diff(link.dest_x) > MAX_STITCH_GAP
-                || link.source_y.abs_diff(link.dest_y) > MAX_ROW_GAP
+            if link.source.0.abs_diff(link.dest.0) > MAX_STITCH_GAP
+                || link.source.1.abs_diff(link.dest.1) > MAX_ROW_GAP
             {
                 return Err(Error::LinkTooFar(link.clone()));
             }
 
-            if self.look_up_link_position(link.source_x, link.source_y).color
-                != self.look_up_link_position(link.dest_x, link.dest_y).color
+            if self.look_up_link_position(link.source).color
+                != self.look_up_link_position(link.dest).color
             {
                 return Err(Error::LinkToDifferentColor(link.clone()));
             }
@@ -239,12 +239,12 @@ impl Fabric {
         y: u16,
     ) -> Result<Option<usize>, Error> {
         for link in dimensions.links.iter() {
-            if self.n_stitches - link.source_x == x
-                && self.n_rows - link.source_y == y
+            if self.n_stitches - link.source.0 == x
+                && self.n_rows - link.source.1 == y
             {
                 for (i, thread) in self.threads.iter().enumerate() {
-                    if thread.x == self.n_stitches - link.dest_x
-                        && thread.y == self.n_rows - link.dest_y
+                    if thread.x == self.n_stitches - link.dest.0
+                        && thread.y == self.n_rows - link.dest.1
                     {
                         return Ok(Some(i));
                     }
