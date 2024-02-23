@@ -343,27 +343,28 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
     svg.add_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
     svg.add_attribute("width", svg_width);
     svg.add_attribute("height", svg_height);
-    svg.add_attribute("viewBox", format!("0 0 {} {}", svg_width, svg_height));
+    svg.add_attribute(
+        "viewBox",
+        format!(
+            "{} {} {} {}",
+            -LINE_WIDTH / 2.0,
+            -LINE_WIDTH / 2.0,
+            svg_width,
+            svg_height
+        )
+    );
 
     svg.add_child(generator.generate_defs());
 
-    let mut translation = XMLElement::new("g");
-    translation.add_attribute(
-        "transform",
-        format!("translate({} {})", LINE_WIDTH / 2.0, LINE_WIDTH / 2.0),
-    );
+    svg.add_child(generator.generate_boxes());
 
-    translation.add_child(generator.generate_boxes());
+    svg.add_child(generator.generate_grid());
 
-    translation.add_child(generator.generate_grid());
+    svg.add_child(generator.generate_rulers());
 
-    translation.add_child(generator.generate_rulers());
+    svg.add_child(generator.generate_box_threads());
 
-    translation.add_child(generator.generate_box_threads());
-
-    translation.add_child(generator.generate_thread_counts());
-
-    svg.add_child(translation);
+    svg.add_child(generator.generate_thread_counts());
 
     svg
 }
