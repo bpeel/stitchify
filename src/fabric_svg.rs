@@ -454,14 +454,9 @@ mod test {
 
     #[test]
     fn test_stitch_count_text() {
-        let mut dimensions = Dimensions {
-            stitches: 30,
-            gauge_stitches: 31,
-            gauge_rows: 57,
-            cm_per_stitch: None,
-            duplicate_rows: 1,
-            links: Vec::new(),
-        };
+        let mut dimensions = Dimensions::default();
+
+        dimensions.gauge_stitches = 31;
 
         assert_eq!(
             &stitch_count_text(&dimensions, 31),

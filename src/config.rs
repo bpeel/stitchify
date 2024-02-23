@@ -130,6 +130,19 @@ pub struct Dimensions {
     pub links: Vec<Link>,
 }
 
+impl Default for Dimensions {
+    fn default() -> Dimensions {
+        Dimensions {
+            stitches: 22,
+            gauge_stitches: 22,
+            gauge_rows: 30,
+            cm_per_stitch: None,
+            duplicate_rows: 1,
+            links: Vec::new(),
+        }
+    }
+}
+
 pub struct Files {
     pub input: String,
     pub output: String,
