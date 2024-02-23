@@ -326,3 +326,115 @@ impl Fabric {
         self.n_rows
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    struct FakeImage {
+    }
+
+    impl FakeImage {
+        const DATA: &'static [u8] =
+            b"##  ##\
+              ##  ##\
+              \x20#### \
+              \x20#### \
+              ##  ##\
+              ##  ##";
+    }
+
+    impl Image for FakeImage {
+        fn width(&self) -> u32 { 6 }
+
+        fn height(&self) -> u32 {
+            FakeImage::DATA.len() as u32 / self.width()
+        }
+
+        fn get_pixel(&self, x: u32, y: u32) -> Color {
+            if FakeImage::DATA[(y * self.width() + x) as usize] == b' ' {
+                [255, 255, 255]
+            } else {
+                [0, 0, 0]
+            }
+        }
+    }
+
+    fn assert_threads(fabric: &Fabric, thread_nums: &[u16]) {
+        let fabric_threads = fabric.stitches().iter().map(|stitch| {
+            stitch.thread
+        }).collect::<Vec<u16>>();
+
+        assert_eq!(&fabric_threads, thread_nums);
+    }
+
+    #[test]
+    fn links() {
+        let image = FakeImage { };
+        let mut dimensions = Dimensions::default();
+
+        dimensions.gauge_stitches = 1;
+        dimensions.gauge_rows = 1;
+        dimensions.stitches = image.width() as u16;
+
+        let fabric = Fabric::new(&image, &dimensions).unwrap();
+
+        assert_eq!(fabric.n_stitches(), image.width() as u16);
+        assert_eq!(fabric.n_rows(), image.height() as u16);
+
+        assert_eq!(fabric.threads().len(), 7);
+
+        assert_eq!(fabric.threads()[0].stitch_count, 16);
+        assert_eq!(fabric.threads()[1].stitch_count, 4);
+        assert_eq!(fabric.threads()[2].stitch_count, 4);
+        assert_eq!(fabric.threads()[3].stitch_count, 2);
+        assert_eq!(fabric.threads()[4].stitch_count, 2);
+        assert_eq!(fabric.threads()[5].stitch_count, 4);
+        assert_eq!(fabric.threads()[6].stitch_count, 4);
+
+        for (i, thread) in fabric.threads().iter().enumerate() {
+            assert_eq!(thread.id as usize, i);
+            assert_eq!(
+                thread.color,
+                fabric.stitches[
+                    (thread.x + thread.y * fabric.n_stitches())
+                        as usize
+                ].color,
+            );
+        }
+
+        assert_threads(
+            &fabric,
+            &[
+                6, 6, 5, 5, 0, 0,
+                6, 6, 5, 5, 0, 0,
+                4, 0, 0, 0, 0, 3,
+                4, 0, 0, 0, 0, 3,
+                2, 2, 1, 1, 0, 0,
+                2, 2, 1, 1, 0, 0,
+            ],
+        );
+
+        dimensions.links = vec![
+            Link { source: (4, 3), dest: (5, 2) },
+            Link { source: (3, 4), dest: (3, 3) },
+        ];
+
+        let fabric = Fabric::new(&image, &dimensions).unwrap();
+
+        assert_eq!(fabric.threads().len(), 6);
+
+        assert_threads(
+            &fabric,
+            &[
+                2, 2, 5, 5, 0, 0,
+                2, 2, 5, 5, 0, 0,
+                4, 2, 2, 0, 0, 3,
+                4, 2, 2, 0, 0, 3,
+                2, 2, 1, 1, 0, 0,
+                2, 2, 1, 1, 0, 0,
+            ],
+        );
+
+    }
+}
