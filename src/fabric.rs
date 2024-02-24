@@ -17,6 +17,7 @@
 use super::config::{Dimensions, Link};
 use std::collections::HashMap;
 use std::fmt;
+use std::cmp::Ordering;
 
 const MAX_ROW_GAP: u16 = 2;
 const MAX_STITCH_GAP: u16 = 1;
@@ -160,8 +161,8 @@ impl Fabric {
             threads: Vec::new(),
         };
 
-        fabric.validate_links(dimensions)?;
-        fabric.calculate_threads(dimensions)?;
+        let link_map = fabric.links_to_hash(dimensions)?;
+        fabric.calculate_threads(&link_map)?;
 
         Ok(fabric)
     }
@@ -181,7 +182,12 @@ impl Fabric {
         ]
     }
 
-    fn validate_links(&self, dimensions: &Dimensions) -> Result<(), Error> {
+    fn links_to_hash(
+        &self,
+        dimensions: &Dimensions
+    ) -> Result<HashMap<(u16, u16), (u16, u16)>, Error> {
+        let mut link_map = HashMap::new();
+
         for link in dimensions.links.iter() {
             self.validate_link_pos(link.source)?;
             self.validate_link_pos(link.dest)?;
@@ -197,14 +203,23 @@ impl Fabric {
             {
                 return Err(Error::LinkToDifferentColor(link.clone()));
             }
+
+            if self.compare_position_thread_order(
+                link.source,
+                link.dest,
+            ).is_gt() {
+                link_map.insert(link.source, link.dest);
+            } else {
+                link_map.insert(link.dest, link.source);
+            };
         }
 
-        Ok(())
+        Ok(link_map)
     }
 
     fn calculate_threads(
         &mut self,
-        dimensions: &Dimensions,
+        link_map: &HashMap<(u16, u16), (u16, u16)>,
     ) -> Result<(), Error> {
         for y in (0..self.n_rows).rev() {
             for mut x in 0..self.n_stitches {
@@ -215,7 +230,7 @@ impl Fabric {
                 let stitch_pos = (x + y * self.n_stitches) as usize;
 
                 let thread = self.find_thread(
-                    dimensions,
+                    link_map,
                     self.stitches[stitch_pos].color.clone(),
                     x,
                     y
@@ -234,24 +249,22 @@ impl Fabric {
 
     fn find_thread_in_links(
         &self,
-        dimensions: &Dimensions,
+        link_map: &HashMap<(u16, u16), (u16, u16)>,
         x: u16,
         y: u16,
     ) -> Result<Option<usize>, Error> {
-        for link in dimensions.links.iter() {
-            if self.n_stitches - link.source.0 == x
-                && self.n_rows - link.source.1 == y
-            {
-                for (i, thread) in self.threads.iter().enumerate() {
-                    if thread.x == self.n_stitches - link.dest.0
-                        && thread.y == self.n_rows - link.dest.1
-                    {
-                        return Ok(Some(i));
-                    }
-                }
+        let source = (self.n_stitches - x, self.n_rows - y);
 
-                return Err(Error::LinkNotFound(link.clone()));
+        if let Some(&dest) = link_map.get(&source) {
+            for (i, thread) in self.threads.iter().enumerate() {
+                if thread.x == self.n_stitches - dest.0
+                    && thread.y == self.n_rows - dest.1
+                {
+                    return Ok(Some(i));
+                }
             }
+
+            return Err(Error::LinkNotFound(Link { source, dest }));
         }
 
         Ok(None)
@@ -282,13 +295,13 @@ impl Fabric {
 
     fn find_thread(
         &mut self,
-        dimensions: &Dimensions,
+        link_map: &HashMap<(u16, u16), (u16, u16)>,
         color: Color,
         x: u16,
         y: u16,
     ) -> Result<&mut Thread, Error> {
         if let Some(thread_index) =
-            self.find_thread_in_links(dimensions, x, y)?
+            self.find_thread_in_links(link_map, x, y)?
             .or_else(|| self.find_neighboring_thread(color, x, y))
         {
             let mut thread = self.threads.remove(thread_index);
@@ -308,6 +321,23 @@ impl Fabric {
         }
 
         return Ok(self.threads.last_mut().unwrap());
+    }
+
+    fn compare_position_thread_order(
+        &self,
+        a: (u16, u16),
+        b: (u16, u16)
+    ) -> Ordering {
+        a.1.cmp(&b.1).then_with(|| {
+            // On odd rows (where the last row is 1), the ordering is
+            // right-to-left, otherwise it is left-to-right.
+
+            if (self.n_rows - a.1) & 1 == 0 {
+                a.0.cmp(&b.0)
+            } else {
+                b.0.cmp(&a.0)
+            }
+        })
     }
 
     pub fn threads(&self) -> &[Thread] {
@@ -415,6 +445,15 @@ mod test {
             ],
         );
 
+        const LINKED_THREADS: [u16; 36] = [
+                2, 2, 5, 5, 0, 0,
+                2, 2, 5, 5, 0, 0,
+                4, 2, 2, 0, 0, 3,
+                4, 2, 2, 0, 0, 3,
+                2, 2, 1, 1, 0, 0,
+                2, 2, 1, 1, 0, 0,
+        ];
+
         dimensions.links = vec![
             Link { source: (4, 3), dest: (5, 2) },
             Link { source: (3, 4), dest: (3, 3) },
@@ -424,17 +463,58 @@ mod test {
 
         assert_eq!(fabric.threads().len(), 6);
 
-        assert_threads(
-            &fabric,
-            &[
-                2, 2, 5, 5, 0, 0,
-                2, 2, 5, 5, 0, 0,
-                4, 2, 2, 0, 0, 3,
-                4, 2, 2, 0, 0, 3,
-                2, 2, 1, 1, 0, 0,
-                2, 2, 1, 1, 0, 0,
-            ],
+        assert_threads(&fabric, &LINKED_THREADS);
+
+        // Try again with the source and dest swapped
+        dimensions.links = vec![
+            Link { source: (5, 2), dest: (4, 3) },
+            Link { source: (3, 3), dest: (3, 4) },
+        ];
+
+        let fabric = Fabric::new(&image, &dimensions).unwrap();
+
+        assert_eq!(fabric.threads().len(), 6);
+
+        assert_threads(&fabric, &LINKED_THREADS);
+    }
+
+    #[test]
+    fn thread_order() {
+        let image = FakeImage { };
+        let mut dimensions = Dimensions::default();
+
+        dimensions.gauge_stitches = 1;
+        dimensions.gauge_rows = 1;
+        dimensions.stitches = image.width() as u16;
+
+        let fabric = Fabric::new(&image, &dimensions).unwrap();
+
+        assert_eq!(fabric.n_rows(), 6);
+
+        assert_eq!(
+            fabric.compare_position_thread_order((3, 5), (2, 5)),
+            Ordering::Less,
+        );
+        assert_eq!(
+            fabric.compare_position_thread_order((2, 5), (3, 5)),
+            Ordering::Greater,
+        );
+        assert_eq!(
+            fabric.compare_position_thread_order((3, 5), (3, 5)),
+            Ordering::Equal,
         );
 
+        assert_eq!(
+            fabric.compare_position_thread_order((3, 4), (2, 4)),
+            Ordering::Greater,
+        );
+        assert_eq!(
+            fabric.compare_position_thread_order((2, 4), (3, 4)),
+            Ordering::Less,
+        );
+        assert_eq!(
+            fabric.compare_position_thread_order((3, 4), (3, 4)),
+            Ordering::Equal,
+        );
     }
 }
