@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use super::fabric::{Fabric, Color};
+use super::fabric::{Fabric, Thread, Color};
 use simple_xml_builder::XMLElement;
 use super::config::Dimensions;
+use std::collections::HashMap;
 use std::fmt::Write;
 use std::fmt;
 
@@ -233,6 +234,18 @@ impl<'a> SvgGenerator<'a> {
         group
     }
 
+    fn generate_stitch_count(&self, y: usize, count: u32) -> XMLElement {
+        let mut count_text = XMLElement::new("text");
+        count_text.add_attribute("x", self.box_width as f32 * 1.5);
+        self.set_text_y(&mut count_text, y as f32 * self.box_height);
+
+        count_text.add_text(
+            stitch_count_text(&self.dimensions, count)
+        );
+
+        count_text
+    }
+
     fn generate_thread_counts(&self ) -> XMLElement {
         let mut group = XMLElement::new("g");
 
@@ -265,14 +278,10 @@ impl<'a> SvgGenerator<'a> {
                 thread.color,
             ));
 
-            let mut count_text = XMLElement::new("text");
-            count_text.add_attribute("x", self.box_width as f32 * 1.5);
-            self.set_text_y(&mut count_text, y as f32 * self.box_height);
-
-            count_text.add_text(
-                stitch_count_text(&self.dimensions, thread.stitch_count)
-            );
-            counts.add_child(count_text);
+            counts.add_child(self.generate_stitch_count(
+                y,
+                thread.stitch_count
+            ));
         }
 
         group.add_child(self.generate_grid_no_id(
@@ -281,6 +290,46 @@ impl<'a> SvgGenerator<'a> {
         ));
 
         group.add_child(counts);
+
+        group
+    }
+
+    fn generate_color_counts(&self) -> XMLElement {
+        let mut group = XMLElement::new("g");
+
+        group.add_attribute("id", "color-counts");
+
+        group.add_attribute(
+            "transform",
+            format!(
+                "translate({} {})",
+                self.box_width * 6.0,
+                self.box_height * (self.fabric.n_rows() + 2) as f32,
+            ),
+        );
+
+        let mut text_group = XMLElement::new("g");
+
+        self.set_text_appearance(&mut text_group);
+
+        let counts = count_color_stitches(&self.fabric.threads());
+
+        for (y, &(color, count)) in counts.iter().enumerate() {
+            group.add_child(self.generate_box(
+                0,
+                y as u16,
+                color,
+            ));
+
+            text_group.add_child(self.generate_stitch_count(y, count));
+        }
+
+        group.add_child(self.generate_grid_no_id(
+            1,
+            counts.len() as u16,
+        ));
+
+        group.add_child(text_group);
 
         group
     }
@@ -366,6 +415,8 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
 
     svg.add_child(generator.generate_thread_counts());
 
+    svg.add_child(generator.generate_color_counts());
+
     svg
 }
 
@@ -422,6 +473,22 @@ fn stitch_count_text(dimensions: &Dimensions, n_stitches: u32) -> String {
     count.push(')');
 
     count
+}
+
+fn count_color_stitches(threads: &[Thread]) -> Vec<(Color, u32)> {
+    let mut counts = HashMap::<Color, u32>::new();
+
+    for thread in threads.iter() {
+        counts.entry(thread.color.clone())
+            .and_modify(|count| *count += thread.stitch_count)
+            .or_insert(thread.stitch_count);
+    }
+
+    let mut counts = counts.into_iter().collect::<Vec<(Color, u32)>>();
+
+    counts.sort_by_key(|count| u32::MAX - count.1);
+
+    counts
 }
 
 #[cfg(test)]
