@@ -330,12 +330,14 @@ impl Fabric {
     ) -> Ordering {
         a.1.cmp(&b.1).then_with(|| {
             // On odd rows (where the last row is 1), the ordering is
-            // right-to-left, otherwise it is left-to-right.
+            // right-to-left, otherwise it is left-to-right. The
+            // lowest numbered stitch is on the right so right-to-left
+            // means increasing numbers.
 
-            if (self.n_rows - a.1) & 1 == 0 {
-                a.0.cmp(&b.0)
-            } else {
+            if a.1 & 1 == 0 {
                 b.0.cmp(&a.0)
+            } else {
+                a.0.cmp(&b.0)
             }
         })
     }
@@ -492,11 +494,11 @@ mod test {
         assert_eq!(fabric.n_rows(), 6);
 
         assert_eq!(
-            fabric.compare_position_thread_order((3, 5), (2, 5)),
+            fabric.compare_position_thread_order((2, 5), (3, 5)),
             Ordering::Less,
         );
         assert_eq!(
-            fabric.compare_position_thread_order((2, 5), (3, 5)),
+            fabric.compare_position_thread_order((3, 5), (2, 5)),
             Ordering::Greater,
         );
         assert_eq!(
@@ -505,16 +507,29 @@ mod test {
         );
 
         assert_eq!(
-            fabric.compare_position_thread_order((3, 4), (2, 4)),
+            fabric.compare_position_thread_order((2, 4), (3, 4)),
             Ordering::Greater,
         );
         assert_eq!(
-            fabric.compare_position_thread_order((2, 4), (3, 4)),
+            fabric.compare_position_thread_order((3, 4), (2, 4)),
             Ordering::Less,
         );
         assert_eq!(
             fabric.compare_position_thread_order((3, 4), (3, 4)),
             Ordering::Equal,
         );
+    }
+
+    #[test]
+    fn horizontal_link() {
+        let image = FakeImage { };
+        let mut dimensions = Dimensions::default();
+
+        dimensions.gauge_stitches = 1;
+        dimensions.gauge_rows = 1;
+        dimensions.stitches = image.width() as u16;
+        dimensions.links.push(Link { source: (1, 1), dest: (2, 1) });
+
+        Fabric::new(&image, &dimensions).unwrap();
     }
 }
