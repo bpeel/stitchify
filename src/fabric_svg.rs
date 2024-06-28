@@ -193,6 +193,43 @@ impl<'a> SvgGenerator<'a> {
         group
     }
 
+    fn generate_missing_stitches(&self) -> XMLElement {
+        let mut group = XMLElement::new("g");
+
+        group.add_attribute("id", "missing-stitches");
+
+        for (stitch_num, stitch) in self.fabric.stitches().iter().enumerate() {
+            if stitch.is_none() {
+                let x = stitch_num as u16 % self.fabric.n_stitches();
+                let y = stitch_num as u16 / self.fabric.n_stitches();
+
+                let mut path = XMLElement::new("path");
+
+                path.add_attribute("stroke-width", LINE_WIDTH / 2.0);
+                path.add_attribute("stroke", "rgb(71%, 71%, 71%)");
+
+                path.add_attribute(
+                    "d",
+                    format!(
+                        "M {} {} l {} {} M {} {} l {} {}",
+                        x as f32 * self.box_width,
+                        y as f32 * self.box_height,
+                        self.box_width,
+                        self.box_height,
+                        (x + 1) as f32 * self.box_width,
+                        y as f32 * self.box_height,
+                        -self.box_width,
+                        self.box_height,
+                    ),
+                );
+
+                group.add_child(path);
+            }
+        }
+
+        group
+    }
+
     fn generate_box_thread_text(
         &self,
         thread: u16,
@@ -414,6 +451,8 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
     svg.add_child(generator.generate_grid());
 
     svg.add_child(generator.generate_rulers());
+
+    svg.add_child(generator.generate_missing_stitches());
 
     svg.add_child(generator.generate_box_threads());
 
