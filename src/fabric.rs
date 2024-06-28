@@ -27,7 +27,7 @@ pub type Color = [u8; 3];
 pub trait Image {
     fn width(&self) -> u32;
     fn height(&self) -> u32;
-    fn get_pixel(&self, x: u32, y: u32) -> Color;
+    fn get_pixel(&self, x: u32, y: u32) -> Option<Color>;
 }
 
 #[derive(Clone, Debug)]
@@ -47,7 +47,7 @@ pub struct Thread {
 
 #[derive(Debug)]
 pub struct Fabric {
-    stitches: Vec<Stitch>,
+    stitches: Vec<Option<Stitch>>,
     n_stitches: u16,
     n_rows: u16,
     threads: Vec<Thread>,
@@ -86,8 +86,8 @@ fn most_popular_color<I: Image>(
     end_x: u32,
     start_y: u32,
     end_y: u32,
-) -> Color {
-    let mut colors = HashMap::<Color, u32>::new();
+) -> Option<Color> {
+    let mut colors = HashMap::<Option<Color>, u32>::new();
 
     for y in start_y..end_y {
         for x in start_x..end_x {
@@ -116,7 +116,7 @@ impl Fabric {
 
         stitches.resize(
             (n_rows * dimensions.stitches) as usize,
-            Stitch { color: [0, 0, 0], thread: 0 },
+            None,
         );
 
         for y in (0..n_rows).rev().step_by(dimensions.duplicate_rows as usize) {
@@ -146,7 +146,10 @@ impl Fabric {
                     sample_end_y,
                 );
 
-                row[x as usize].color = color;
+                row[x as usize] = color.map(|color| Stitch {
+                    color,
+                    thread: 0,
+                });
             }
 
             for i in 0..(dimensions.duplicate_rows - 1).min(y) {
@@ -170,18 +173,20 @@ impl Fabric {
     }
 
     fn validate_link_pos(&self, (x, y): (u16, u16)) -> Result<(), Error> {
-        if x == 0 || x > self.n_stitches || y == 0 || y > self.n_rows {
+        if x == 0 || x > self.n_stitches || y == 0 || y > self.n_rows
+            || self.look_up_link_position((x, y)).is_none()
+        {
             Err(Error::PosOutsideOfFabric(x, y))
         } else {
             Ok(())
         }
     }
 
-    fn look_up_link_position(&self, (x, y): (u16, u16)) -> &Stitch {
-        &self.stitches[
+    fn look_up_link_position(&self, (x, y): (u16, u16)) -> Option<&Color> {
+        self.stitches[
             (self.n_stitches - x
              + (self.n_rows - y) * self.n_stitches) as usize
-        ]
+        ].as_ref().map(|stitch| &stitch.color)
     }
 
     fn links_to_hash(
@@ -201,8 +206,8 @@ impl Fabric {
                 return Err(Error::LinkTooFar(link.clone()));
             }
 
-            if self.look_up_link_position(link.source).color
-                != self.look_up_link_position(link.dest).color
+            if self.look_up_link_position(link.source)
+                != self.look_up_link_position(link.dest)
             {
                 return Err(Error::LinkToDifferentColor(link.clone()));
             }
@@ -232,16 +237,21 @@ impl Fabric {
 
                 let stitch_pos = (x + y * self.n_stitches) as usize;
 
-                let thread = self.find_thread(
-                    link_map,
-                    self.stitches[stitch_pos].color.clone(),
-                    x,
-                    y
-                )?;
+                if let Some(stitch) = self.stitches[stitch_pos].as_ref() {
+                    let thread = self.find_thread(
+                        link_map,
+                        stitch.color.clone(),
+                        x,
+                        y
+                    )?;
 
-                thread.stitch_count += 1;
+                    thread.stitch_count += 1;
 
-                self.stitches[stitch_pos].thread = thread.id;
+                    self.stitches[stitch_pos]
+                        .as_mut()
+                        .unwrap()
+                        .thread = thread.id;
+                }
             }
         }
 
@@ -349,7 +359,7 @@ impl Fabric {
         &self.threads
     }
 
-    pub fn stitches(&self) -> &[Stitch] {
+    pub fn stitches(&self) -> &[Option<Stitch>] {
         &self.stitches
     }
 
@@ -366,38 +376,55 @@ impl Fabric {
 mod test {
     use super::*;
 
+    const FAKE_IMAGE_DATA: &'static [u8] =
+        b"##  ##\
+          ##  ##\
+          \x20#### \
+          \x20#### \
+          ##  ##\
+          ##  ##";
+
     struct FakeImage {
+        width: u32,
+        data: &'static [u8],
+    }
+
+    impl Default for FakeImage {
+        fn default() -> FakeImage {
+            FakeImage::new(FAKE_IMAGE_DATA, 6)
+        }
     }
 
     impl FakeImage {
-        const DATA: &'static [u8] =
-            b"##  ##\
-              ##  ##\
-              \x20#### \
-              \x20#### \
-              ##  ##\
-              ##  ##";
+        fn new(data: &'static [u8], width: u32) -> FakeImage {
+            FakeImage {
+                width,
+                data
+            }
+        }
     }
 
     impl Image for FakeImage {
-        fn width(&self) -> u32 { 6 }
-
-        fn height(&self) -> u32 {
-            FakeImage::DATA.len() as u32 / self.width()
+        fn width(&self) -> u32 {
+            self.width
         }
 
-        fn get_pixel(&self, x: u32, y: u32) -> Color {
-            if FakeImage::DATA[(y * self.width() + x) as usize] == b' ' {
-                [255, 255, 255]
-            } else {
-                [0, 0, 0]
+        fn height(&self) -> u32 {
+            self.data.len() as u32 / self.width()
+        }
+
+        fn get_pixel(&self, x: u32, y: u32) -> Option<Color> {
+            match self.data[(y * self.width() + x) as usize] {
+                b' ' => Some([255, 255, 255]),
+                b'x' => None,
+                _ => Some([0, 0, 0]),
             }
         }
     }
 
     fn assert_threads(fabric: &Fabric, thread_nums: &[u16]) {
         let fabric_threads = fabric.stitches().iter().map(|stitch| {
-            stitch.thread
+            stitch.as_ref().unwrap().thread
         }).collect::<Vec<u16>>();
 
         assert_eq!(&fabric_threads, thread_nums);
@@ -405,7 +432,7 @@ mod test {
 
     #[test]
     fn links() {
-        let image = FakeImage { };
+        let image = FakeImage::default();
         let mut dimensions = Dimensions::default();
 
         dimensions.gauge_stitches = 1;
@@ -434,7 +461,7 @@ mod test {
                 fabric.stitches[
                     (thread.x + thread.y * fabric.n_stitches())
                         as usize
-                ].color,
+                ].as_ref().unwrap().color,
             );
         }
 
@@ -485,7 +512,7 @@ mod test {
 
     #[test]
     fn thread_order() {
-        let image = FakeImage { };
+        let image = FakeImage::default();
         let mut dimensions = Dimensions::default();
 
         dimensions.gauge_stitches = 1;
@@ -525,7 +552,7 @@ mod test {
 
     #[test]
     fn horizontal_link() {
-        let image = FakeImage { };
+        let image = FakeImage::default();
         let mut dimensions = Dimensions::default();
 
         dimensions.gauge_stitches = 1;
@@ -538,7 +565,7 @@ mod test {
 
     #[test]
     fn allow_link_gaps() {
-        let image = FakeImage { };
+        let image = FakeImage::default();
         let mut dimensions = Dimensions::default();
 
         dimensions.gauge_stitches = 1;
@@ -554,5 +581,34 @@ mod test {
         dimensions.allow_link_gaps = true;
 
         Fabric::new(&image, &dimensions).unwrap();
+    }
+
+    #[test]
+    fn link_to_missing_stitch() {
+        const IMAGE_DATA: &'static [u8] = b"x  x";
+        let image = FakeImage::new(IMAGE_DATA, 4);
+        let mut dimensions = Dimensions::default();
+
+        dimensions.gauge_stitches = 1;
+        dimensions.gauge_rows = 1;
+        dimensions.stitches = image.width() as u16;
+
+        dimensions.links.push(Link { source: (3, 1), dest: (2, 1) });
+
+        Fabric::new(&image, &dimensions).unwrap();
+
+        dimensions.links[0] = Link { source: (4, 1), dest: (3, 1) };
+
+        assert_eq!(
+            Fabric::new(&image, &dimensions).unwrap_err().to_string(),
+            "Position 4,1 is outside of the fabric",
+        );
+
+        dimensions.links[0] = Link { source: (2, 1), dest: (1, 1) };
+
+        assert_eq!(
+            Fabric::new(&image, &dimensions).unwrap_err().to_string(),
+            "Position 1,1 is outside of the fabric",
+        );
     }
 }

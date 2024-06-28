@@ -23,7 +23,7 @@ use std::fs::File;
 use image::DynamicImage;
 use image::buffer::ConvertBuffer;
 
-struct ImageBufWrapper(image::RgbImage);
+struct ImageBufWrapper(image::RgbaImage);
 
 impl fabric::Image for ImageBufWrapper {
     fn width(&self) -> u32 {
@@ -34,8 +34,14 @@ impl fabric::Image for ImageBufWrapper {
         self.0.height()
     }
 
-    fn get_pixel(&self, x: u32, y: u32) -> fabric::Color {
-        self.0.get_pixel(x, y).0
+    fn get_pixel(&self, x: u32, y: u32) -> Option<fabric::Color> {
+        let pixel = self.0.get_pixel(x, y);
+
+        if pixel[3] >= 128 {
+            Some([pixel[0], pixel[1], pixel[2]])
+        } else {
+            None
+        }
     }
 }
 
@@ -59,10 +65,10 @@ fn main() -> ExitCode {
     };
 
     let image = match image {
-        DynamicImage::ImageRgb8(image) => image,
+        DynamicImage::ImageRgb8(image) => image.convert(),
         DynamicImage::ImageLuma8(image) => image.convert(),
         DynamicImage::ImageLumaA8(image) => image.convert(),
-        DynamicImage::ImageRgba8(image) => image.convert(),
+        DynamicImage::ImageRgba8(image) => image,
         DynamicImage::ImageLuma16(image) => image.convert(),
         DynamicImage::ImageLumaA16(image) => image.convert(),
         DynamicImage::ImageRgb16(image) => image.convert(),

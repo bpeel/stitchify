@@ -71,10 +71,12 @@ impl<'a> SvgGenerator<'a> {
         group.add_attribute("id", "boxes");
 
         for (stitch_num, stitch) in self.fabric.stitches().iter().enumerate() {
-            let x = stitch_num as u16 % self.fabric.n_stitches();
-            let y = stitch_num as u16 / self.fabric.n_stitches();
+            if let Some(stitch) = stitch {
+                let x = stitch_num as u16 % self.fabric.n_stitches();
+                let y = stitch_num as u16 / self.fabric.n_stitches();
 
-            group.add_child(self.generate_box(x, y, stitch.color));
+                group.add_child(self.generate_box(x, y, stitch.color));
+            }
         }
 
         group
@@ -220,15 +222,17 @@ impl<'a> SvgGenerator<'a> {
         group.add_attribute("id", "box-threads");
 
         for (stitch_num, stitch) in self.fabric.stitches().iter().enumerate() {
-            let x = stitch_num as u16 % self.fabric.n_stitches();
-            let y = stitch_num as u16 / self.fabric.n_stitches();
+            if let Some(stitch) = stitch {
+                let x = stitch_num as u16 % self.fabric.n_stitches();
+                let y = stitch_num as u16 / self.fabric.n_stitches();
 
-            group.add_child(self.generate_box_thread_text(
-                stitch.thread,
-                x as f32 * self.box_width,
-                y as f32 * self.box_height,
-                stitch.color,
-            ));
+                group.add_child(self.generate_box_thread_text(
+                    stitch.thread,
+                    x as f32 * self.box_width,
+                    y as f32 * self.box_height,
+                    stitch.color,
+                ));
+            }
         }
 
         group
