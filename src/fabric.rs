@@ -30,12 +30,13 @@ pub trait Image {
     fn get_pixel(&self, x: u32, y: u32) -> Color;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Stitch {
     pub color: Color,
     pub thread: u16,
 }
 
+#[derive(Debug)]
 pub struct Thread {
     pub x: u16,
     pub y: u16,
@@ -44,6 +45,7 @@ pub struct Thread {
     pub stitch_count: u32,
 }
 
+#[derive(Debug)]
 pub struct Fabric {
     stitches: Vec<Stitch>,
     n_stitches: u16,
@@ -192,8 +194,9 @@ impl Fabric {
             self.validate_link_pos(link.source)?;
             self.validate_link_pos(link.dest)?;
 
-            if link.source.0.abs_diff(link.dest.0) > MAX_STITCH_GAP
-                || link.source.1.abs_diff(link.dest.1) > MAX_ROW_GAP
+            if !dimensions.allow_link_gaps
+                && (link.source.0.abs_diff(link.dest.0) > MAX_STITCH_GAP
+                    || link.source.1.abs_diff(link.dest.1) > MAX_ROW_GAP)
             {
                 return Err(Error::LinkTooFar(link.clone()));
             }
@@ -529,6 +532,26 @@ mod test {
         dimensions.gauge_rows = 1;
         dimensions.stitches = image.width() as u16;
         dimensions.links.push(Link { source: (1, 1), dest: (2, 1) });
+
+        Fabric::new(&image, &dimensions).unwrap();
+    }
+
+    #[test]
+    fn allow_link_gaps() {
+        let image = FakeImage { };
+        let mut dimensions = Dimensions::default();
+
+        dimensions.gauge_stitches = 1;
+        dimensions.gauge_rows = 1;
+        dimensions.stitches = image.width() as u16;
+        dimensions.links.push(Link { source: (5, 1), dest: (2, 1) });
+
+        assert_eq!(
+            Fabric::new(&image, &dimensions).unwrap_err().to_string(),
+            "Link is too far: 5,1->2,1",
+        );
+
+        dimensions.allow_link_gaps = true;
 
         Fabric::new(&image, &dimensions).unwrap();
     }

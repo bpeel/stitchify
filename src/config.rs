@@ -38,6 +38,8 @@ struct Cli {
     cm_per_stitch: Option<f32>,
     #[arg(short, long)]
     garter: bool,
+    #[arg(short = 'G', long)]
+    allow_link_gaps: bool,
     #[arg(short, long = "link", value_name = "LINK",
           value_parser = clap::value_parser!(Link))]
     links: Vec<Link>,
@@ -127,6 +129,7 @@ pub struct Dimensions {
     pub gauge_rows: u16,
     pub cm_per_stitch: Option<f32>,
     pub duplicate_rows: u16,
+    pub allow_link_gaps: bool,
     pub links: Vec<Link>,
 }
 
@@ -138,6 +141,7 @@ impl Default for Dimensions {
             gauge_rows: 30,
             cm_per_stitch: None,
             duplicate_rows: 1,
+            allow_link_gaps: false,
             links: Vec::new(),
         }
     }
@@ -163,6 +167,7 @@ impl Config {
             gauge_rows,
             cm_per_stitch,
             garter,
+            allow_link_gaps,
             links,
         } = Cli::parse();
 
@@ -173,6 +178,7 @@ impl Config {
                 gauge_rows,
                 cm_per_stitch,
                 duplicate_rows: garter as u16 + 1,
+                allow_link_gaps,
                 links,
             },
             files: Files { input, output },
