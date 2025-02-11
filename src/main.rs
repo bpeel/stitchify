@@ -52,19 +52,25 @@ fn build_fabric<I: Image>(
     config: &config::Config,
 ) -> Result<fabric::Fabric, fabric::Error> {
     if config.mitre {
-        // First generate the fabric without the links
-        let mut no_links_dimensions = config.dimensions.clone();
-        no_links_dimensions.links.clear();
-        let fabric = fabric::Fabric::new(image, &no_links_dimensions)?;
+        // First generate the fabric with square stitches and without
+        // the links
+        let mut dimensions = config.dimensions.clone();
+        dimensions.gauge_rows = config.dimensions.gauge_stitches;
+        dimensions.duplicate_rows = 1;
+        dimensions.links.clear();
+        let fabric = fabric::Fabric::new(image, &dimensions)?;
 
         let image = mitre_image::MitreImage::new(&fabric);
 
-        let mut square_dimensions = config.dimensions.clone();
-        square_dimensions.gauge_stitches = 1;
-        square_dimensions.gauge_rows = 1;
-        square_dimensions.stitches = image.width() as u16;
+        // Next use stitches that are twice as wide as they are tall
+        // but force garter stitch
+        let mut dimensions = config.dimensions.clone();
+        dimensions.gauge_stitches = 1;
+        dimensions.gauge_rows = 2;
+        dimensions.duplicate_rows = 2;
+        dimensions.stitches = image.width() as u16;
 
-        fabric::Fabric::new(&image, &square_dimensions)
+        fabric::Fabric::new(&image, &dimensions)
     } else {
         fabric::Fabric::new(image, &config.dimensions)
     }
