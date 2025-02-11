@@ -38,6 +38,8 @@ struct Cli {
     cm_per_stitch: Option<f32>,
     #[arg(short, long)]
     garter: bool,
+    #[arg(short, long)]
+    mitre: bool,
     #[arg(short = 'G', long)]
     allow_link_gaps: bool,
     #[arg(short, long = "link", value_name = "LINK",
@@ -154,6 +156,7 @@ pub struct Files {
 
 pub struct Config {
     pub dimensions: Dimensions,
+    pub mitre: bool,
     pub files: Files,
 }
 
@@ -167,6 +170,7 @@ impl Config {
             gauge_rows,
             cm_per_stitch,
             garter,
+            mitre,
             allow_link_gaps,
             links,
         } = Cli::parse();
@@ -181,6 +185,7 @@ impl Config {
                 allow_link_gaps,
                 links,
             },
+            mitre,
             files: Files { input, output },
         }
     }

@@ -17,15 +17,17 @@
 mod config;
 mod fabric;
 mod fabric_svg;
+mod mitre_image;
 
 use std::process::ExitCode;
 use std::fs::File;
 use image::DynamicImage;
 use image::buffer::ConvertBuffer;
+use fabric::Image;
 
 struct ImageBufWrapper(image::RgbaImage);
 
-impl fabric::Image for ImageBufWrapper {
+impl Image for ImageBufWrapper {
     fn width(&self) -> u32 {
         self.0.width()
     }
@@ -42,6 +44,29 @@ impl fabric::Image for ImageBufWrapper {
         } else {
             None
         }
+    }
+}
+
+fn build_fabric<I: Image>(
+    image: &I,
+    config: &config::Config,
+) -> Result<fabric::Fabric, fabric::Error> {
+    if config.mitre {
+        // First generate the fabric without the links
+        let mut no_links_dimensions = config.dimensions.clone();
+        no_links_dimensions.links.clear();
+        let fabric = fabric::Fabric::new(image, &no_links_dimensions)?;
+
+        let image = mitre_image::MitreImage::new(&fabric);
+
+        let mut square_dimensions = config.dimensions.clone();
+        square_dimensions.gauge_stitches = 1;
+        square_dimensions.gauge_rows = 1;
+        square_dimensions.stitches = image.width() as u16;
+
+        fabric::Fabric::new(&image, &square_dimensions)
+    } else {
+        fabric::Fabric::new(image, &config.dimensions)
     }
 }
 
@@ -81,9 +106,9 @@ fn main() -> ExitCode {
         },
     };
 
-    let fabric = match fabric::Fabric::new(
+    let fabric = match build_fabric(
         &ImageBufWrapper(image),
-        &config.dimensions,
+        &config,
     ) {
         Ok(fabric) => fabric,
         Err(e) => {
