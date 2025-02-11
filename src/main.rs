@@ -70,6 +70,24 @@ fn build_fabric<I: Image>(
         dimensions.duplicate_rows = 2;
         dimensions.stitches = image.width() as u16;
 
+        dimensions.allow_link_gaps = true;
+
+        // Automatically add links across the middle gaps
+        if image.height() > 1 {
+            let center = image.width() as u16 / 2;
+
+            for y in 2..=image.height() as u16 {
+                dimensions.links.push(config::Link {
+                    source: (center - y + 1, y * 2 - 1),
+                    dest: (center + y, y * 2 - 1),
+                });
+                dimensions.links.push(config::Link {
+                    source: (center + y, y * 2),
+                    dest: (center - y + 1, y * 2),
+                });
+            }
+        }
+
         fabric::Fabric::new(&image, &dimensions)
     } else {
         fabric::Fabric::new(image, &config.dimensions)
