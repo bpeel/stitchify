@@ -1,4 +1,4 @@
-// Stichify – A utility to generate intersia knitting patterns
+// Stichify – A utility to generate intarsia knitting patterns
 // Copyright (C) 2025  Neil Roberts
 //
 // This program is free software: you can redistribute it and/or modify
