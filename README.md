@@ -31,3 +31,9 @@ If you are doing fair isle knitting then you don’t need the letters on the cha
 ## Tweaking the image
 
 If you want to tweak the colours in the generated image, you can do so by editing the colours of the boxes in Inkscape. If you then want to regenerate the stitch counts, one option could be to delete everything from the chart except the “boxes” group and then re-export it as a PNG. If you then rerun the program using this PNG it will recreate the diagram with the updated colours.
+
+## Mitre square
+
+If you pass the `--mitre` option the program will try to generate a pattern that is suitable for knitting a mitre square. That is, it will be a square that is knit in garter stitch by starting with enough stitches for the right and bottom sides of the square and then doing two reductions per pair of rows so that it sort of forms two triangles that join up along the hypotenuse to make a square. If you use this option the gauge will be ignored and the image will be sampled as squares. This only really works properly if the source image is a square too.
+
+![Example of the conversion to a mitre square](mitre-example.png)
