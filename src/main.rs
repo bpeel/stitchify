@@ -47,16 +47,22 @@ impl Image for ImageBufWrapper {
     }
 }
 
-fn build_fabric<I: Image>(
+fn build_svg<I: Image>(
     image: &I,
     config: &config::Config,
-) -> Result<fabric::Fabric, fabric::Error> {
+) -> Result<simple_xml_builder::XMLElement, fabric::Error> {
     if config.mitre {
-        mitre::make_mitre_fabric(image, &config.dimensions).map(|(fabric, _)| {
-            fabric
-        })
+        let (fabric, dimensions) = mitre::make_mitre_fabric(
+            image,
+            &config.dimensions,
+        )?;
+
+        Ok(fabric_svg::convert(&dimensions, &fabric))
     } else {
-        fabric::Fabric::new(image, &config.dimensions)
+        Ok(fabric_svg::convert(
+            &config.dimensions,
+            &fabric::Fabric::new(image, &config.dimensions)?,
+        ))
     }
 }
 
@@ -96,18 +102,16 @@ fn main() -> ExitCode {
         },
     };
 
-    let fabric = match build_fabric(
+    let svg = match build_svg(
         &ImageBufWrapper(image),
         &config,
     ) {
-        Ok(fabric) => fabric,
+        Ok(svg) => svg,
         Err(e) => {
             eprintln!("{}", e);
             return ExitCode::FAILURE;
         },
     };
-
-    let svg = fabric_svg::convert(&config.dimensions, &fabric);
 
     let output = match File::create(&config.files.output) {
         Ok(file) => file,
