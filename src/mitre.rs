@@ -74,14 +74,13 @@ pub fn make_mitre_fabric<I: Image>(
     let mut dimensions = dimensions.clone();
     dimensions.gauge_rows = dimensions.gauge_stitches;
     dimensions.duplicate_rows = 1;
-    dimensions.links.clear();
+    let mut links = std::mem::take(&mut dimensions.links);
     let fabric = fabric::Fabric::new(image, &dimensions)?;
 
     let image = MitreImage::new(&fabric);
 
     // Next use stitches that are twice as wide as they are tall
     // but force garter stitch
-    let mut dimensions = dimensions.clone();
     dimensions.gauge_stitches = 1;
     dimensions.gauge_rows = 2;
     dimensions.duplicate_rows = 2;
@@ -94,16 +93,18 @@ pub fn make_mitre_fabric<I: Image>(
         let center = image.width() as u16 / 2;
 
         for y in 2..=image.height() as u16 {
-            dimensions.links.push(Link {
+            links.push(Link {
                 source: (center - y + 1, y * 2 - 1),
                 dest: (center + y, y * 2 - 1),
             });
-            dimensions.links.push(Link {
+            links.push(Link {
                 source: (center + y, y * 2),
                 dest: (center - y + 1, y * 2),
             });
         }
     }
+
+    dimensions.links = links;
 
     fabric::Fabric::new(&image, &dimensions)
 }
