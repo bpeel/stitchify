@@ -81,8 +81,7 @@ pub fn make_mitre_fabric<I: Image>(
 
     // Next use stitches that are twice as wide as they are tall
     // but force garter stitch
-    dimensions.gauge_stitches = 1;
-    dimensions.gauge_rows = 2;
+    dimensions.gauge_rows = dimensions.gauge_stitches * 2;
     dimensions.duplicate_rows = 2;
     dimensions.stitches = image.width() as u16;
 
