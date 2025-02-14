@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use super::fabric::{Image, Fabric, Color};
+use super::fabric::{self, Image, Fabric, Color};
+use super::config::{Dimensions, Link};
 
-pub struct MitreImage<'a> {
+struct MitreImage<'a> {
     fabric: &'a Fabric,
 }
 
@@ -64,10 +65,52 @@ impl<'a> MitreImage<'a> {
     }
 }
 
+pub fn make_mitre_fabric<I: Image>(
+    image: &I,
+    dimensions: &Dimensions,
+) -> Result<Fabric, fabric::Error> {
+    // First generate the fabric with square stitches and without
+    // the links
+    let mut dimensions = dimensions.clone();
+    dimensions.gauge_rows = dimensions.gauge_stitches;
+    dimensions.duplicate_rows = 1;
+    dimensions.links.clear();
+    let fabric = fabric::Fabric::new(image, &dimensions)?;
+
+    let image = MitreImage::new(&fabric);
+
+    // Next use stitches that are twice as wide as they are tall
+    // but force garter stitch
+    let mut dimensions = dimensions.clone();
+    dimensions.gauge_stitches = 1;
+    dimensions.gauge_rows = 2;
+    dimensions.duplicate_rows = 2;
+    dimensions.stitches = image.width() as u16;
+
+    dimensions.allow_link_gaps = true;
+
+    // Automatically add links across the middle gaps
+    if image.height() > 1 {
+        let center = image.width() as u16 / 2;
+
+        for y in 2..=image.height() as u16 {
+            dimensions.links.push(Link {
+                source: (center - y + 1, y * 2 - 1),
+                dest: (center + y, y * 2 - 1),
+            });
+            dimensions.links.push(Link {
+                source: (center + y, y * 2),
+                dest: (center - y + 1, y * 2),
+            });
+        }
+    }
+
+    fabric::Fabric::new(&image, &dimensions)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use super::super::config::Dimensions;
 
     struct FakeImage {
     }

@@ -17,7 +17,7 @@
 mod config;
 mod fabric;
 mod fabric_svg;
-mod mitre_image;
+mod mitre;
 
 use std::process::ExitCode;
 use std::fs::File;
@@ -52,43 +52,7 @@ fn build_fabric<I: Image>(
     config: &config::Config,
 ) -> Result<fabric::Fabric, fabric::Error> {
     if config.mitre {
-        // First generate the fabric with square stitches and without
-        // the links
-        let mut dimensions = config.dimensions.clone();
-        dimensions.gauge_rows = config.dimensions.gauge_stitches;
-        dimensions.duplicate_rows = 1;
-        dimensions.links.clear();
-        let fabric = fabric::Fabric::new(image, &dimensions)?;
-
-        let image = mitre_image::MitreImage::new(&fabric);
-
-        // Next use stitches that are twice as wide as they are tall
-        // but force garter stitch
-        let mut dimensions = config.dimensions.clone();
-        dimensions.gauge_stitches = 1;
-        dimensions.gauge_rows = 2;
-        dimensions.duplicate_rows = 2;
-        dimensions.stitches = image.width() as u16;
-
-        dimensions.allow_link_gaps = true;
-
-        // Automatically add links across the middle gaps
-        if image.height() > 1 {
-            let center = image.width() as u16 / 2;
-
-            for y in 2..=image.height() as u16 {
-                dimensions.links.push(config::Link {
-                    source: (center - y + 1, y * 2 - 1),
-                    dest: (center + y, y * 2 - 1),
-                });
-                dimensions.links.push(config::Link {
-                    source: (center + y, y * 2),
-                    dest: (center - y + 1, y * 2),
-                });
-            }
-        }
-
-        fabric::Fabric::new(&image, &dimensions)
+        mitre::make_mitre_fabric(image, &config.dimensions)
     } else {
         fabric::Fabric::new(image, &config.dimensions)
     }
