@@ -52,7 +52,9 @@ fn build_fabric<I: Image>(
     config: &config::Config,
 ) -> Result<fabric::Fabric, fabric::Error> {
     if config.mitre {
-        mitre::make_mitre_fabric(image, &config.dimensions)
+        mitre::make_mitre_fabric(image, &config.dimensions).map(|(fabric, _)| {
+            fabric
+        })
     } else {
         fabric::Fabric::new(image, &config.dimensions)
     }

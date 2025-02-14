@@ -68,7 +68,7 @@ impl<'a> MitreImage<'a> {
 pub fn make_mitre_fabric<I: Image>(
     image: &I,
     dimensions: &Dimensions,
-) -> Result<Fabric, fabric::Error> {
+) -> Result<(Fabric, Dimensions), fabric::Error> {
     // First generate the fabric with square stitches and without
     // the links
     let mut dimensions = dimensions.clone();
@@ -105,7 +105,7 @@ pub fn make_mitre_fabric<I: Image>(
 
     dimensions.links = links;
 
-    fabric::Fabric::new(&image, &dimensions)
+    fabric::Fabric::new(&image, &dimensions).map(|fabric| (fabric, dimensions))
 }
 
 #[cfg(test)]
