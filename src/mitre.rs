@@ -52,9 +52,11 @@ impl MitreImage {
         for y in 0..n_stitches {
             let row_width = y + 1;
 
-            for x in 0..row_width {
+            for x in 0..row_width - 1 {
                 pixels.push(sampler.sample(x, y, 1));
             }
+
+            pixels.push(sampler.sample_lower_left_triangle(row_width - 1, y));
 
             // Add the empty middle section between the two halves
             let old_len = pixels.len();
@@ -63,7 +65,9 @@ impl MitreImage {
                 None
             );
 
-            for x in 0..row_width {
+            pixels.push(sampler.sample_upper_right_triangle(row_width - 1, y));
+
+            for x in 1..row_width {
                 pixels.push(sampler.sample(y, row_width - 1 - x, 1));
             }
         }
@@ -94,14 +98,28 @@ pub fn make_mitre_fabric<I: Image>(
     if image.height() > 1 {
         let center = image.width() as u16 / 2;
 
-        for y in 2..=image.height() as u16 {
+        for y in 0..image.height() as u16 - 1 {
+            let image_y = image.height() - 2 - y as u32;
+
+            let left_x = center - y - 2;
+            let right_x = center + y + 1;
+
+            let left = image.get_pixel(left_x as u32, image_y);
+            let right = image.get_pixel(right_x as u32, image_y);
+
+            if left.is_none() || right.is_none() || left != right {
+                continue;
+            }
+
+            let bottom_row = y * 2 + 3;
+
             dimensions.links.push(Link {
-                source: (center - y + 1, y * 2 - 1),
-                dest: (center + y, y * 2 - 1),
+                source: (right_x + 1, bottom_row),
+                dest: (left_x + 1, bottom_row),
             });
             dimensions.links.push(Link {
-                source: (center + y, y * 2),
-                dest: (center - y + 1, y * 2),
+                source: (left_x + 1, bottom_row + 1),
+                dest: (right_x + 1, bottom_row + 1),
             });
         }
     }
@@ -130,6 +148,56 @@ mod test {
         }
     }
 
+    const UNLINKED_DIAGONAL_IMAGE_DATA: &[u8; 12 * 12] =
+        b"abbbbbbbbbbb\
+          aabbbbbbbbbb\
+          aaabbbbbbbbb\
+          aaaabbbbbbbb\
+          aaaa    bbbb\
+          aaaa    bbbb\
+          aaaa    bbbb\
+          aaaa    bbbb\
+          aaaaaaaaabbb\
+          aaaaaaaaaabb\
+          aaaaaaaaaaab\
+          aaaaaaaaaaaa";
+
+    const LINKED_DIAGONAL_IMAGE_DATA: &[u8; 12 * 12] =
+        b"aaaaaaaaaaaa\
+          aaaaaaaaaaaa\
+          aaaaaaaaaaaa\
+          aaaaaaaaaaaa\
+          aaaaabbbbbbb\
+          aaaaaabbbbbb\
+          aaaaaaabbbbb\
+          aaaaaaaabbbb\
+          aaaaaaaaabbb\
+          aaaaaaaaaabb\
+          aaaaaaaaaaab\
+          aaaaaaaaaaaa";
+
+    struct FakeDiagonalImage {
+        data: [u8; 12 * 12],
+    }
+
+    impl Image for FakeDiagonalImage {
+        fn width(&self) -> u32 {
+            12
+        }
+
+        fn height(&self) -> u32 {
+            12
+        }
+
+        fn get_pixel(&self, x: u32, y: u32) -> Option<Color> {
+            match self.data[(y * 12 + x) as usize] {
+                b'a' => Some([255, 0, 0]),
+                b'b' => Some([0, 255, 0]),
+                _ => None,
+            }
+        }
+    }
+
     #[test]
     fn mitre_image() {
         let fake_image = FakeImage { };
@@ -155,5 +223,90 @@ mod test {
         assert_eq!(image.get_pixel(24, 0), None);
         assert_eq!(image.get_pixel(46, 0), None);
         assert_eq!(image.get_pixel(47, 0), Some([0, 0, 0]));
+    }
+
+    #[test]
+    fn unlinked_diagonal_image() {
+        let fake_image = FakeDiagonalImage {
+            data: UNLINKED_DIAGONAL_IMAGE_DATA.clone(),
+        };
+
+        let mut dimensions = Dimensions::default();
+        dimensions.stitches = 3;
+
+        let (fabric, dimensions) =
+            make_mitre_fabric(&fake_image, &dimensions).unwrap();
+
+        assert_eq!(fabric.n_rows(), 6);
+        assert_eq!(fabric.n_stitches(), 6);
+        assert_eq!(dimensions.stitches, 6);
+        assert_eq!(dimensions.duplicate_rows, 2);
+        assert_eq!(dimensions.gauge_rows, dimensions.gauge_stitches * 2);
+        assert_eq!(dimensions.links.len(), 0);
+
+        assert_eq!(
+            fabric.stitches()[0].as_ref().unwrap().color,
+            [255, 0, 0],
+        );
+        assert!(fabric.stitches()[1].is_none());
+        assert!(fabric.stitches()[2].is_none());
+        assert!(fabric.stitches()[3].is_none());
+        assert!(fabric.stitches()[4].is_none());
+        assert_eq!(
+            fabric.stitches()[5].as_ref().unwrap().color,
+            [0, 255, 0],
+        );
+
+        assert_eq!(
+            fabric.stitches()[12].as_ref().unwrap().color,
+            [255, 0, 0],
+        );
+        assert!(fabric.stitches()[13].is_none());
+        assert!(fabric.stitches()[14].is_none());
+        assert!(fabric.stitches()[15].is_none());
+        assert!(fabric.stitches()[16].is_none());
+        assert_eq!(
+            fabric.stitches()[17].as_ref().unwrap().color,
+            [0, 255, 0],
+        );
+    }
+
+    #[test]
+    fn linked_diagonal_image() {
+        let fake_image = FakeDiagonalImage {
+            data: LINKED_DIAGONAL_IMAGE_DATA.clone(),
+        };
+
+        let mut dimensions = Dimensions::default();
+        dimensions.stitches = 3;
+
+        let (fabric, dimensions) =
+            make_mitre_fabric(&fake_image, &dimensions).unwrap();
+
+        assert_eq!(fabric.n_rows(), 6);
+        assert_eq!(fabric.n_stitches(), 6);
+        assert_eq!(dimensions.stitches, 6);
+        assert_eq!(dimensions.duplicate_rows, 2);
+        assert_eq!(dimensions.gauge_rows, dimensions.gauge_stitches * 2);
+
+        assert_eq!(dimensions.links.len(), 2);
+
+        assert_eq!(dimensions.links[0].source, (6, 5));
+        assert_eq!(dimensions.links[0].dest, (1, 5));
+        assert_eq!(dimensions.links[1].source, (1, 6));
+        assert_eq!(dimensions.links[1].dest, (6, 6));
+
+        assert_eq!(
+            fabric.stitches()[0].as_ref().unwrap().color,
+            [255, 0, 0],
+        );
+        assert!(fabric.stitches()[1].is_none());
+        assert!(fabric.stitches()[2].is_none());
+        assert!(fabric.stitches()[3].is_none());
+        assert!(fabric.stitches()[4].is_none());
+        assert_eq!(
+            fabric.stitches()[5].as_ref().unwrap().color,
+            [255, 0, 0],
+        );
     }
 }
