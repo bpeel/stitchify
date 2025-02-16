@@ -16,6 +16,7 @@
 
 use super::config::{Dimensions, Link};
 use super::stitch_image::{Image, Color};
+use super::sampler::Sampler;
 use std::collections::HashMap;
 use std::fmt;
 use std::cmp::Ordering;
@@ -73,27 +74,6 @@ impl fmt::Display for Error {
     }
 }
 
-fn most_popular_color<I: Image>(
-    image: &I,
-    start_x: u32,
-    end_x: u32,
-    start_y: u32,
-    end_y: u32,
-) -> Option<Color> {
-    let mut colors = HashMap::<Option<Color>, u32>::new();
-
-    for y in start_y..end_y {
-        for x in start_x..end_x {
-            let color = image.get_pixel(x, y);
-            colors.entry(color.clone())
-                .and_modify(|e| *e += 1)
-                .or_insert(1);
-        }
-    }
-
-    colors.keys().max_by_key(|&color| colors[color]).unwrap().clone()
-}
-
 impl Fabric {
     pub fn new<I: Image>(
         image: &I,
@@ -112,32 +92,18 @@ impl Fabric {
             None,
         );
 
+        let sampler = Sampler::new(image, sample_width, sample_height);
+
         for y in (0..n_rows).rev().step_by(dimensions.duplicate_rows as usize) {
-            let sample_start_y =
-                (sample_height * (y as f32
-                                  - (dimensions.duplicate_rows - 1) as f32))
-                .round()
-                .max(0.0) as u32;
-            let sample_end_y = ((sample_height * (y + 1) as f32).round() as u32)
-                .min(image.height());
+            let row_height = (dimensions.duplicate_rows - 1).min(y) + 1;
+            let sample_y = y + 1 - row_height;
 
             let (before_row, row) = stitches.split_at_mut(
                 (y * dimensions.stitches) as usize
             );
 
-            for x in 0..dimensions.stitches as u32 {
-                let sample_start_x = (sample_width * x as f32).round() as u32;
-                let sample_end_x = ((sample_width * (x as f32 + 1.0))
-                                    .round() as u32)
-                    .min(image.width());
-
-                let color = most_popular_color(
-                    image,
-                    sample_start_x,
-                    sample_end_x,
-                    sample_start_y,
-                    sample_end_y,
-                );
+            for x in 0..dimensions.stitches {
+                let color = sampler.sample(x, sample_y, row_height);
 
                 row[x as usize] = color.map(|color| Stitch {
                     color,
