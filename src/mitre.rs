@@ -17,51 +17,60 @@
 use super::fabric::{self, Fabric};
 use super::stitch_image::{Image, Color};
 use super::config::{Dimensions, Link};
+use super::sampler::Sampler;
 
-struct MitreImage<'a> {
-    fabric: &'a Fabric,
+struct MitreImage {
+    size: usize,
+    pixels: Vec<Option<Color>>,
 }
 
-impl<'a> Image for MitreImage<'a> {
+impl Image for MitreImage {
     fn width(&self) -> u32 {
-        self.fabric.n_stitches() as u32 * 2
+        self.size as u32 * 2
     }
 
     fn height(&self) -> u32 {
-        self.fabric.n_rows().min(self.fabric.n_stitches()) as u32
+        self.size as u32
     }
 
     fn get_pixel(&self, x: u32, y: u32) -> Option<Color> {
-        let n_stitches = self.fabric.n_stitches() as u32;
-        let n_rows = self.height();
-        let row_width = n_stitches + y + 1 - n_rows;
-
-        if x < n_stitches {
-            if x < row_width {
-                self.fabric.stitches()[(x + y * n_rows) as usize]
-                    .as_ref()
-                    .map(|s| {
-                        s.color
-                    })
-            } else {
-                None
-            }
-        } else if x >= n_stitches * 2 - row_width {
-            let x = x - n_stitches;
-
-            self.fabric.stitches()[
-                ((n_rows - 1 - x) * n_stitches + y) as usize
-            ].as_ref().map(|s| s.color)
-        } else {
-            None
-        }
+        self.pixels[y as usize * self.size * 2 + x as usize]
     }
 }
 
-impl<'a> MitreImage<'a> {
-    pub fn new(fabric: &'a Fabric) -> MitreImage<'a> {
+impl MitreImage {
+    pub fn new<I: Image>(
+        image: &I,
+        n_stitches: u16,
+    ) -> MitreImage {
+        let image_size = image.width().min(image.height());
+        let sample_size = image_size as f32 / n_stitches as f32;
+        let mut pixels =
+            Vec::with_capacity((n_stitches * n_stitches * 2) as usize);
+        let sampler = Sampler::new(image, sample_size, sample_size);
+
+        for y in 0..n_stitches {
+            let row_width = y + 1;
+
+            for x in 0..row_width {
+                pixels.push(sampler.sample(x, y, 1));
+            }
+
+            // Add the empty middle section between the two halves
+            let old_len = pixels.len();
+            pixels.resize(
+                old_len + (n_stitches - row_width) as usize * 2,
+                None
+            );
+
+            for x in 0..row_width {
+                pixels.push(sampler.sample(y, row_width - 1 - x, 1));
+            }
+        }
+
         MitreImage {
-            fabric
+            size: n_stitches as usize,
+            pixels,
         }
     }
 }
@@ -70,18 +79,11 @@ pub fn make_mitre_fabric<I: Image>(
     image: &I,
     dimensions: &Dimensions,
 ) -> Result<(Fabric, Dimensions), fabric::Error> {
-    // First generate the fabric with square stitches and without
-    // the links
+    let image = MitreImage::new(image, dimensions.stitches);
+
+    // Use stitches that are twice as wide as they are tall but force
+    // garter stitch
     let mut dimensions = dimensions.clone();
-    dimensions.gauge_rows = dimensions.gauge_stitches;
-    dimensions.duplicate_rows = 1;
-    let mut links = std::mem::take(&mut dimensions.links);
-    let fabric = fabric::Fabric::new(image, &dimensions)?;
-
-    let image = MitreImage::new(&fabric);
-
-    // Next use stitches that are twice as wide as they are tall
-    // but force garter stitch
     dimensions.gauge_rows = dimensions.gauge_stitches * 2;
     dimensions.duplicate_rows = 2;
     dimensions.stitches = image.width() as u16;
@@ -93,18 +95,16 @@ pub fn make_mitre_fabric<I: Image>(
         let center = image.width() as u16 / 2;
 
         for y in 2..=image.height() as u16 {
-            links.push(Link {
+            dimensions.links.push(Link {
                 source: (center - y + 1, y * 2 - 1),
                 dest: (center + y, y * 2 - 1),
             });
-            links.push(Link {
+            dimensions.links.push(Link {
                 source: (center + y, y * 2),
                 dest: (center - y + 1, y * 2),
             });
         }
     }
-
-    dimensions.links = links;
 
     fabric::Fabric::new(&image, &dimensions).map(|fabric| (fabric, dimensions))
 }
@@ -134,14 +134,10 @@ mod test {
     fn mitre_image() {
         let fake_image = FakeImage { };
 
-        let mut dimensions = Dimensions::default();
-        dimensions.gauge_stitches = 1;
-        dimensions.gauge_rows = 1;
-        dimensions.stitches = fake_image.width() as u16;
+        let image = MitreImage::new(&fake_image, 24);
 
-        let fabric = Fabric::new(&fake_image, &dimensions).unwrap();
-
-        let image = MitreImage::new(&fabric);
+        assert_eq!(image.width(), 48);
+        assert_eq!(image.height(), 24);
 
         assert_eq!(image.get_pixel(0, 23), Some([0, 23, 0]));
         assert_eq!(image.get_pixel(23, 23), Some([23, 23, 0]));
