@@ -163,19 +163,38 @@ impl<'a> SvgGenerator<'a> {
 
         self.set_text_appearance(&mut group);
 
+        let mut left_rulers = XMLElement::new("g");
+
+        left_rulers.add_attribute("id", "left-rulers");
+
         for y in 0..self.fabric.n_rows() {
             let mut text = XMLElement::new("text");
 
             self.set_text_position(
                 &mut text,
-                self.fabric.n_stitches() as f32 * self.box_width,
+                -BOX_WIDTH,
                 y as f32 * self.box_height,
             );
 
             text.add_text(self.fabric.n_rows() - y);
 
-            group.add_child(text);
+            left_rulers.add_child(text);
         }
+
+        group.add_child(left_rulers);
+
+        let mut right_rulers = XMLElement::new("use");
+        right_rulers.add_attribute("xlink:href", "#left-rulers");
+        right_rulers.add_attribute(
+            "x",
+            BOX_WIDTH * (self.fabric.n_stitches() + 1) as f32,
+        );
+
+        group.add_child(right_rulers);
+
+        let mut top_rulers = XMLElement::new("g");
+
+        top_rulers.add_attribute("id", "top-rulers");
 
         for x in 0..self.fabric.n_stitches() {
             let mut text = XMLElement::new("text");
@@ -183,13 +202,24 @@ impl<'a> SvgGenerator<'a> {
             self.set_text_position(
                 &mut text,
                 x as f32 * self.box_width,
-                self.fabric.n_rows() as f32 * self.box_height,
+                -self.box_height,
             );
 
             text.add_text(self.fabric.n_stitches() - x);
 
-            group.add_child(text);
+            top_rulers.add_child(text);
         }
+
+        group.add_child(top_rulers);
+
+        let mut bottom_rulers = XMLElement::new("use");
+        bottom_rulers.add_attribute("xlink:href", "#top-rulers");
+        bottom_rulers.add_attribute(
+            "y",
+            self.box_height * (self.fabric.n_rows() + 1) as f32,
+        );
+
+        group.add_child(bottom_rulers);
 
         group
     }
@@ -423,12 +453,11 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
 
     let mut svg = XMLElement::new("svg");
 
-    let svg_width = ((fabric.n_stitches() + 1) as f32 * BOX_WIDTH)
-        + LINE_WIDTH / 2.0;
-    let svg_height = ((fabric.n_rows() as usize + 2 + fabric.threads().len())
+    let svg_width = (fabric.n_stitches() + 2) as f32 * BOX_WIDTH;
+    let svg_height = ((fabric.n_rows() as usize + 3 + fabric.threads().len())
                       as f32
                       * generator.box_height)
-        + LINE_WIDTH;
+        + LINE_WIDTH / 2.0;
 
     svg.add_attribute("xmlns", "http://www.w3.org/2000/svg");
     svg.add_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
@@ -438,8 +467,8 @@ pub fn convert(dimensions: &Dimensions, fabric: &Fabric) -> XMLElement {
         "viewBox",
         format!(
             "{} {} {} {}",
-            -LINE_WIDTH / 2.0,
-            -LINE_WIDTH / 2.0,
+            -BOX_WIDTH,
+            -generator.box_height,
             svg_width,
             svg_height
         )
