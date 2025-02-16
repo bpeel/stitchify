@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use super::fabric::{self, Image, Fabric, Color};
+use super::fabric::{self, Fabric};
+use super::stitch_image::{Image, Color};
 use super::config::{Dimensions, Link};
 
 struct MitreImage<'a> {

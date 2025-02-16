@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use super::fabric::{Fabric, Thread, Color};
+use super::fabric::{Fabric, Thread};
+use super::stitch_image::Color;
 use simple_xml_builder::XMLElement;
 use super::config::Dimensions;
 use std::collections::HashMap;

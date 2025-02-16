@@ -15,20 +15,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use super::config::{Dimensions, Link};
+use super::stitch_image::{Image, Color};
 use std::collections::HashMap;
 use std::fmt;
 use std::cmp::Ordering;
 
 const MAX_ROW_GAP: u16 = 2;
 const MAX_STITCH_GAP: u16 = 1;
-
-pub type Color = [u8; 3];
-
-pub trait Image {
-    fn width(&self) -> u32;
-    fn height(&self) -> u32;
-    fn get_pixel(&self, x: u32, y: u32) -> Option<Color>;
-}
 
 #[derive(Clone, Debug)]
 pub struct Stitch {

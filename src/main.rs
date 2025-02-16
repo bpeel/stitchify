@@ -18,12 +18,13 @@ mod config;
 mod fabric;
 mod fabric_svg;
 mod mitre;
+mod stitch_image;
 
 use std::process::ExitCode;
 use std::fs::File;
 use image::DynamicImage;
 use image::buffer::ConvertBuffer;
-use fabric::Image;
+use stitch_image::{Color, Image};
 
 struct ImageBufWrapper(image::RgbaImage);
 
@@ -36,7 +37,7 @@ impl Image for ImageBufWrapper {
         self.0.height()
     }
 
-    fn get_pixel(&self, x: u32, y: u32) -> Option<fabric::Color> {
+    fn get_pixel(&self, x: u32, y: u32) -> Option<Color> {
         let pixel = self.0.get_pixel(x, y);
 
         if pixel[3] >= 128 {
