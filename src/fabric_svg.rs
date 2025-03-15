@@ -93,8 +93,8 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
 
         for (stitch_num, stitch) in self.fabric.stitches().iter().enumerate() {
             if let Some(stitch) = stitch {
-                let x = stitch_num as u16 % self.fabric.n_stitches();
-                let y = stitch_num as u16 / self.fabric.n_stitches();
+                let x = stitch_num as u16 % self.fabric.n_stitches() + 1;
+                let y = stitch_num as u16 / self.fabric.n_stitches() + 1;
 
                 group.add_child(self.generate_box(x, y, stitch.color));
             }
@@ -145,15 +145,27 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
     }
 
     fn generate_grid(&self) -> D::Element {
-        let fabric = self.fabric;
-        let mut path = self.generate_grid_no_id(
-            fabric.n_stitches(),
-            fabric.n_rows()
+        let mut group = self.document.create_element("g");
+
+        group.add_attribute("id", "grid");
+
+        group.add_attribute(
+            "transform",
+            format!(
+                "translate({} {})",
+                self.box_width,
+                self.box_height
+            ),
         );
 
-        path.add_attribute("id", "grid");
+        let path = self.generate_grid_no_id(
+            self.fabric.n_stitches(),
+            self.fabric.n_rows()
+        );
 
-        path
+        group.add_child(path);
+
+        group
     }
 
     fn set_text_appearance(&self, element: &mut D::Element) {
@@ -192,8 +204,8 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
 
             self.set_text_position(
                 &mut text,
-                -BOX_WIDTH,
-                y as f32 * self.box_height,
+                0.0,
+                (y + 1) as f32 * self.box_height,
             );
 
             text.add_text(self.fabric.n_rows() - y);
@@ -221,8 +233,8 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
 
             self.set_text_position(
                 &mut text,
-                x as f32 * self.box_width,
-                -self.box_height,
+                (x + 1) as f32 * self.box_width,
+                0.0,
             );
 
             text.add_text(self.fabric.n_stitches() - x);
@@ -251,8 +263,8 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
 
         for (stitch_num, stitch) in self.fabric.stitches().iter().enumerate() {
             if stitch.is_none() {
-                let x = stitch_num as u16 % self.fabric.n_stitches();
-                let y = stitch_num as u16 / self.fabric.n_stitches();
+                let x = stitch_num as u16 % self.fabric.n_stitches() + 1;
+                let y = stitch_num as u16 / self.fabric.n_stitches() + 1;
 
                 let mut path = self.document.create_element("path");
 
@@ -312,8 +324,8 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
 
         for (stitch_num, stitch) in self.fabric.stitches().iter().enumerate() {
             if let Some(stitch) = stitch {
-                let x = stitch_num as u16 % self.fabric.n_stitches();
-                let y = stitch_num as u16 / self.fabric.n_stitches();
+                let x = stitch_num as u16 % self.fabric.n_stitches() + 1;
+                let y = stitch_num as u16 / self.fabric.n_stitches() + 1;
 
                 group.add_child(self.generate_box_thread_text(
                     stitch.thread,
@@ -348,8 +360,8 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
             "transform",
             format!(
                 "translate({} {})",
-                self.box_width,
-                self.box_height * (self.fabric.n_rows() + 2) as f32,
+                self.box_width * 2.0,
+                self.box_height * (self.fabric.n_rows() + 3) as f32,
             ),
         );
 
@@ -396,8 +408,8 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
             "transform",
             format!(
                 "translate({} {})",
-                self.box_width * 6.0,
-                self.box_height * (self.fabric.n_rows() + 2) as f32,
+                self.box_width * 7.0,
+                self.box_height * (self.fabric.n_rows() + 3) as f32,
             ),
         );
 
@@ -492,9 +504,7 @@ pub fn convert<D: Document>(
     svg.add_attribute(
         "viewBox",
         format!(
-            "{} {} {} {}",
-            -BOX_WIDTH,
-            -generator.box_height,
+            "0 0 {} {}",
             svg_width,
             svg_height
         )
