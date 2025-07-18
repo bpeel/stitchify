@@ -99,6 +99,7 @@ impl fmt::Display for Link {
 pub enum StitchText {
     None,
     Thread,
+    Runs,
 }
 
 #[derive(Clone)]

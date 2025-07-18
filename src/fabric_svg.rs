@@ -256,6 +256,72 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
         group
     }
 
+    fn generate_run_counts(&self) -> D::Element {
+        let mut group = self.document.create_element("g");
+
+        group.add_attribute("id", "run-counts");
+
+        self.set_text_appearance(&mut group);
+
+        let stitches = self.fabric.stitches();
+        let n_stitches = self.fabric.n_stitches();
+
+        for row in 0..self.fabric.n_rows() {
+            let y = self.fabric.n_rows() - 1 - row;
+            let mut run_count = 0;
+
+            for stitch in 0..n_stitches {
+                run_count += 1;
+
+                let x = if (row & 1) == 0 {
+                    n_stitches - 1 - stitch
+                } else {
+                    stitch
+                };
+
+                let color = stitches[(y * n_stitches + x) as usize].clone();
+
+                let change = stitch >= n_stitches - 1
+                    || {
+                        let next = if (row & 1) == 0 {
+                            x - 1
+                        } else {
+                            x + 1
+                        };
+                        color != stitches[(y * n_stitches + next) as usize]
+                    };
+
+                if change {
+                    let mut text = self.document.create_element("text");
+
+                    let x = if row & 1 == 0 {
+                        x + run_count - 1
+                    } else {
+                        x + 1 - run_count
+                    };
+
+                    self.set_text_position(
+                        &mut text,
+                        (x + 1) as f32 * BOX_WIDTH,
+                        (y + 1) as f32 * self.box_height,
+                    );
+
+                    text.add_text(run_count);
+
+                    if let Some(stitch) = color {
+                        set_text_color(&mut text, stitch.color);
+                    }
+
+                    group.add_child(text);
+
+                    run_count = 0;
+                }
+            }
+        }
+
+        group
+    }
+
     fn generate_missing_stitches(&self) -> D::Element {
         let mut group = self.document.create_element("g");
 
@@ -310,9 +376,7 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
         element.add_attribute("x", x);
         element.add_attribute("y", y);
 
-        if color.iter().map(|&x| x as u16).sum::<u16>() < 384 {
-            element.add_attribute("fill", "rgb(100%, 100%, 100%)");
-        }
+        set_text_color(&mut element, color);
 
         element
     }
@@ -523,6 +587,7 @@ pub fn convert<D: Document>(
     match dimensions.stitch_text {
         StitchText::None => (),
         StitchText::Thread => svg.add_child(generator.generate_box_threads()),
+        StitchText::Runs => svg.add_child(generator.generate_run_counts()),
     }
 
     svg.add_child(generator.generate_thread_counts());
@@ -602,6 +667,15 @@ fn count_color_stitches(threads: &[Thread]) -> Vec<(Color, u32)> {
     counts.sort_by_key(|count| u32::MAX - count.1);
 
     counts
+}
+
+fn set_text_color<E: Element>(
+    element: &mut E,
+    box_color: Color,
+) {
+    if box_color.iter().map(|&x| x as u16).sum::<u16>() < 384 {
+        element.add_attribute("fill", "rgb(100%, 100%, 100%)");
+    }
 }
 
 #[cfg(test)]

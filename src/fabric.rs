@@ -24,7 +24,7 @@ use std::cmp::Ordering;
 const MAX_ROW_GAP: u16 = 2;
 const MAX_STITCH_GAP: u16 = 1;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Stitch {
     pub color: Color,
     pub thread: u16,
