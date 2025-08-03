@@ -83,8 +83,8 @@ impl Fabric {
 
         let sample_width = image.width() as f32 / dimensions.stitches as f32;
         let sample_height = sample_width
-            * dimensions.gauge_stitches as f32
-            / dimensions.gauge_rows as f32;
+            * dimensions.gauge_stitches
+            / dimensions.gauge_rows;
         let n_rows = (image.height() as f32 / sample_height).round() as u16;
 
         stitches.resize(
@@ -394,8 +394,8 @@ mod test {
         let image = FakeImage::default();
         let mut dimensions = Dimensions::default();
 
-        dimensions.gauge_stitches = 1;
-        dimensions.gauge_rows = 1;
+        dimensions.gauge_stitches = 1.0;
+        dimensions.gauge_rows = 1.0;
         dimensions.stitches = image.width() as u16;
 
         let fabric = Fabric::new(&image, &dimensions).unwrap();
@@ -474,8 +474,8 @@ mod test {
         let image = FakeImage::default();
         let mut dimensions = Dimensions::default();
 
-        dimensions.gauge_stitches = 1;
-        dimensions.gauge_rows = 1;
+        dimensions.gauge_stitches = 1.0;
+        dimensions.gauge_rows = 1.0;
         dimensions.stitches = image.width() as u16;
 
         let fabric = Fabric::new(&image, &dimensions).unwrap();
@@ -514,8 +514,8 @@ mod test {
         let image = FakeImage::default();
         let mut dimensions = Dimensions::default();
 
-        dimensions.gauge_stitches = 1;
-        dimensions.gauge_rows = 1;
+        dimensions.gauge_stitches = 1.0;
+        dimensions.gauge_rows = 1.0;
         dimensions.stitches = image.width() as u16;
         dimensions.links.push(Link { source: (1, 1), dest: (2, 1) });
 
@@ -527,8 +527,8 @@ mod test {
         let image = FakeImage::default();
         let mut dimensions = Dimensions::default();
 
-        dimensions.gauge_stitches = 1;
-        dimensions.gauge_rows = 1;
+        dimensions.gauge_stitches = 1.0;
+        dimensions.gauge_rows = 1.0;
         dimensions.stitches = image.width() as u16;
         dimensions.links.push(Link { source: (5, 1), dest: (2, 1) });
 
@@ -548,8 +548,8 @@ mod test {
         let image = FakeImage::new(IMAGE_DATA, 4);
         let mut dimensions = Dimensions::default();
 
-        dimensions.gauge_stitches = 1;
-        dimensions.gauge_rows = 1;
+        dimensions.gauge_stitches = 1.0;
+        dimensions.gauge_rows = 1.0;
         dimensions.stitches = image.width() as u16;
 
         dimensions.links.push(Link { source: (3, 1), dest: (2, 1) });

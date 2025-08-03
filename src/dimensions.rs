@@ -98,8 +98,8 @@ impl fmt::Display for Link {
 #[derive(Clone)]
 pub struct Dimensions {
     pub stitches: u16,
-    pub gauge_stitches: u16,
-    pub gauge_rows: u16,
+    pub gauge_stitches: f32,
+    pub gauge_rows: f32,
     pub cm_per_stitch: Option<f32>,
     pub duplicate_rows: u16,
     pub allow_link_gaps: bool,
@@ -110,8 +110,8 @@ impl Default for Dimensions {
     fn default() -> Dimensions {
         Dimensions {
             stitches: 22,
-            gauge_stitches: 22,
-            gauge_rows: 30,
+            gauge_stitches: 22.0,
+            gauge_rows: 30.0,
             cm_per_stitch: None,
             duplicate_rows: 1,
             allow_link_gaps: false,

@@ -88,7 +88,7 @@ pub fn make_mitre_fabric<I: Image>(
     // Use stitches that are twice as wide as they are tall but force
     // garter stitch
     let mut dimensions = dimensions.clone();
-    dimensions.gauge_rows = dimensions.gauge_stitches * 2;
+    dimensions.gauge_rows = dimensions.gauge_stitches * 2.0;
     dimensions.duplicate_rows = 2;
     dimensions.stitches = image.width() as u16;
 
@@ -241,7 +241,7 @@ mod test {
         assert_eq!(fabric.n_stitches(), 6);
         assert_eq!(dimensions.stitches, 6);
         assert_eq!(dimensions.duplicate_rows, 2);
-        assert_eq!(dimensions.gauge_rows, dimensions.gauge_stitches * 2);
+        assert_eq!(dimensions.gauge_rows, dimensions.gauge_stitches * 2.0);
         assert_eq!(dimensions.links.len(), 0);
 
         assert_eq!(
@@ -287,7 +287,7 @@ mod test {
         assert_eq!(fabric.n_stitches(), 6);
         assert_eq!(dimensions.stitches, 6);
         assert_eq!(dimensions.duplicate_rows, 2);
-        assert_eq!(dimensions.gauge_rows, dimensions.gauge_stitches * 2);
+        assert_eq!(dimensions.gauge_rows, dimensions.gauge_stitches * 2.0);
 
         assert_eq!(dimensions.links.len(), 2);
 

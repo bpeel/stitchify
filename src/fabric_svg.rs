@@ -483,8 +483,8 @@ pub fn convert<D: Document>(
         dimensions: dimensions,
         box_width: BOX_WIDTH,
         box_height: BOX_WIDTH
-            * dimensions.gauge_stitches as f32
-            / dimensions.gauge_rows as f32,
+            * dimensions.gauge_stitches
+            / dimensions.gauge_rows,
         fabric,
         document,
     };
@@ -572,8 +572,9 @@ fn stitch_count_text(dimensions: &Dimensions, n_stitches: u32) -> String {
             // much yarn to make the stitch than the resulting width
             // of the stitch. Add half of the gauge to round to the
             // nearest integer instead of rounding down.
-            (n_stitches * 100 * 3 + dimensions.gauge_stitches as u32 / 2)
-                / dimensions.gauge_stitches as u32
+            ((n_stitches as f32 * 100.0 * 3.0 + dimensions.gauge_stitches / 2.0)
+             / dimensions.gauge_stitches)
+                .round() as u32
         },
     };
 
@@ -632,7 +633,7 @@ mod test {
     fn test_stitch_count_text() {
         let mut dimensions = Dimensions::default();
 
-        dimensions.gauge_stitches = 31;
+        dimensions.gauge_stitches = 31.0;
 
         assert_eq!(
             &stitch_count_text(&dimensions, 31),
