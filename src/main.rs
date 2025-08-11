@@ -21,6 +21,7 @@ mod fabric_svg;
 mod mitre;
 mod stitch_image;
 mod sampler;
+mod gauge;
 
 use std::process::ExitCode;
 use std::fs::File;

@@ -20,6 +20,8 @@ You can specify the number of stitches that you want to cast on with the `-s` op
 
 If you want the image to be more precise you can specify your knitting gauge using the `--gauge-stitches` and `--gauge-rows` options. This would usually be the number stitches and rows in a 10cm×10cm square. The gauge is used to calculate the aspect ratio of the box representing a stitch and the approximate length of yarn needed for each bobbin.
 
+If you don’t want to use a 10cm square you can specify the number of stitches or rows for a different measurement. For example, `--gauge-stitches=30/15cm` means 30 stitches measures 15cm, or `--gauge-rows=10/4in` means that 10 rows measures 4 inches.
+
 ## Garter stitch
 
 If you are going to use the pattern to do garter stitch, you can specify the `-g` option. This will make it so that the generated chart will only change colour on odd rows. This is important for garter stitch because otherwise the colour change will look weird on the right side if the colour changes on even rows.

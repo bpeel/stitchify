@@ -16,6 +16,7 @@
 
 use clap::Parser;
 use super::dimensions::{Dimensions, Link};
+use super::gauge;
 
 #[derive(Parser)]
 #[command(name = "Stitchify")]
@@ -28,10 +29,10 @@ struct Cli {
           value_parser = clap::value_parser!(u16).range(1..))]
     stitches: u16,
     #[arg(long, value_name = "COUNT", default_value_t = 22.0,
-          value_parser = parse_gauge)]
+          value_parser = gauge::parse)]
     gauge_stitches: f32,
     #[arg(long, value_name = "COUNT", default_value_t = 30.0,
-          value_parser = parse_gauge)]
+          value_parser = gauge::parse)]
     gauge_rows: f32,
     #[arg(long, value_name = "CM")]
     cm_per_stitch: Option<f32>,
@@ -86,20 +87,4 @@ impl Config {
             files: Files { input, output },
         }
     }
-}
-
-fn parse_gauge(
-    arg: &str,
-) -> Result<f32, Box<dyn std::error::Error + Sync + Send>> {
-    arg.parse::<f32>()
-        .map_err(|e| e.into())
-        .and_then(|arg| {
-            if arg <= 0.0 {
-                Err(format!("Gauge {} is too small", arg).into())
-            } else if !arg.is_normal() {
-                Err(format!("Invalid gauge: {}", arg).into())
-            } else {
-                Ok(arg)
-            }
-        })
 }
