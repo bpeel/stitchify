@@ -20,7 +20,12 @@ use super::gauge;
 
 impl ValueEnum for StitchText {
     fn value_variants<'a>() -> &'a [Self] {
-        &[StitchText::None, StitchText::Thread, StitchText::Runs]
+        &[
+            StitchText::None,
+            StitchText::Thread,
+            StitchText::Runs,
+            StitchText::Ruler,
+        ]
     }
 
     fn to_possible_value(&self) -> Option<PossibleValue> {
@@ -33,6 +38,9 @@ impl ValueEnum for StitchText {
             },
             StitchText::Runs => {
                 PossibleValue::new("runs").help("Counts of runs of same color")
+            },
+            StitchText::Ruler => {
+                PossibleValue::new("ruler").help("Row number")
             },
         })
     }

@@ -100,6 +100,7 @@ pub enum StitchText {
     None,
     Thread,
     Runs,
+    Ruler,
 }
 
 #[derive(Clone)]

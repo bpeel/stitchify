@@ -322,6 +322,44 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
         group
     }
 
+    fn generate_midline_rulers(&self) -> D::Element {
+        let mut group = self.document.create_element("g");
+
+        group.add_attribute("id", "midline-rulers");
+
+        self.set_text_appearance(&mut group);
+
+        self.fabric.stitches().iter().enumerate().fold(
+            self.fabric.stitches()[0].clone(),
+            |prev, (i, stitch)| {
+                let x = i as u16 % self.fabric.n_stitches();
+
+                if x > 0 && prev != *stitch {
+                    let y = i as u16 / self.fabric.n_stitches();
+
+                    let mut text = self.document.create_element("text");
+
+                    self.set_text_position(
+                        &mut text,
+                        (x + 1) as f32 * BOX_WIDTH,
+                        (y + 1) as f32 * self.box_height,
+                    );
+
+                    text.add_text(self.fabric.n_rows() - y);
+
+                    if let Some(stitch) = stitch {
+                        set_text_color(&mut text, stitch.color);
+                    }
+
+                    group.add_child(text);
+                }
+
+            stitch.clone()
+        });
+
+        group
+    }
+
     fn generate_missing_stitches(&self) -> D::Element {
         let mut group = self.document.create_element("g");
 
@@ -588,6 +626,7 @@ pub fn convert<D: Document>(
         StitchText::None => (),
         StitchText::Thread => svg.add_child(generator.generate_box_threads()),
         StitchText::Runs => svg.add_child(generator.generate_run_counts()),
+        StitchText::Ruler => svg.add_child(generator.generate_midline_rulers()),
     }
 
     svg.add_child(generator.generate_thread_counts());
