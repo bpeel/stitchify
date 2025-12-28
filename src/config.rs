@@ -14,9 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use clap::Parser;
-use super::dimensions::{Dimensions, Link};
+use clap::{Parser, ValueEnum, builder::PossibleValue};
+use super::dimensions::{Dimensions, Link, StitchText};
 use super::gauge;
+
+impl ValueEnum for StitchText {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[StitchText::None, StitchText::Thread]
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        Some(match self {
+            StitchText::None => {
+                PossibleValue::new("none").help("No thread text")
+            },
+            StitchText::Thread => {
+                PossibleValue::new("thread").help("Thread letter")
+            },
+        })
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "Stitchify")]
@@ -40,6 +57,8 @@ struct Cli {
     garter: bool,
     #[arg(short, long)]
     mitre: bool,
+    #[arg(short = 't', long, default_value = "thread")]
+    stitch_text: StitchText,
     #[arg(short = 'G', long)]
     allow_link_gaps: bool,
     #[arg(short, long = "link", value_name = "LINK",
@@ -69,6 +88,7 @@ impl Config {
             cm_per_stitch,
             garter,
             mitre,
+            stitch_text,
             allow_link_gaps,
             links,
         } = Cli::parse();
@@ -82,6 +102,7 @@ impl Config {
                 duplicate_rows: garter as u16 + 1,
                 allow_link_gaps,
                 links,
+                stitch_text,
             },
             mitre,
             files: Files { input, output },

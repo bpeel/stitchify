@@ -16,7 +16,7 @@
 
 use super::fabric::{Fabric, Thread};
 use super::stitch_image::Color;
-use super::dimensions::Dimensions;
+use super::dimensions::{Dimensions, StitchText};
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::fmt;
@@ -520,7 +520,10 @@ pub fn convert<D: Document>(
 
     svg.add_child(generator.generate_missing_stitches());
 
-    svg.add_child(generator.generate_box_threads());
+    match dimensions.stitch_text {
+        StitchText::None => (),
+        StitchText::Thread => svg.add_child(generator.generate_box_threads()),
+    }
 
     svg.add_child(generator.generate_thread_counts());
 

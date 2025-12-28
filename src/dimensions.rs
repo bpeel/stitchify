@@ -95,6 +95,12 @@ impl fmt::Display for Link {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StitchText {
+    None,
+    Thread,
+}
+
 #[derive(Clone)]
 pub struct Dimensions {
     pub stitches: u16,
@@ -104,6 +110,7 @@ pub struct Dimensions {
     pub duplicate_rows: u16,
     pub allow_link_gaps: bool,
     pub links: Vec<Link>,
+    pub stitch_text: StitchText,
 }
 
 impl Default for Dimensions {
@@ -116,6 +123,7 @@ impl Default for Dimensions {
             duplicate_rows: 1,
             allow_link_gaps: false,
             links: Vec::new(),
+            stitch_text: StitchText::Thread,
         }
     }
 }
