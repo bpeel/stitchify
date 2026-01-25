@@ -70,6 +70,12 @@ struct Cli {
     mitre: bool,
     #[arg(short = 't', long, default_value = "thread")]
     stitch_text: StitchText,
+    #[arg(long = "hide-thread-counts", default_value_t = true,
+          action = clap::ArgAction::SetFalse)]
+    show_thread_counts: bool,
+    #[arg(long = "hide-color-counts", default_value_t = true,
+          action = clap::ArgAction::SetFalse)]
+    show_color_counts: bool,
     #[arg(short = 'G', long)]
     allow_link_gaps: bool,
     #[arg(short, long = "link", value_name = "LINK",
@@ -100,6 +106,8 @@ impl Config {
             garter,
             mitre,
             stitch_text,
+            show_thread_counts,
+            show_color_counts,
             allow_link_gaps,
             links,
         } = Cli::parse();
@@ -114,6 +122,8 @@ impl Config {
                 allow_link_gaps,
                 links,
                 stitch_text,
+                show_thread_counts,
+                show_color_counts,
             },
             mitre,
             files: Files { input, output },

@@ -113,6 +113,8 @@ pub struct Dimensions {
     pub allow_link_gaps: bool,
     pub links: Vec<Link>,
     pub stitch_text: StitchText,
+    pub show_thread_counts: bool,
+    pub show_color_counts: bool,
 }
 
 impl Default for Dimensions {
@@ -126,6 +128,8 @@ impl Default for Dimensions {
             allow_link_gaps: false,
             links: Vec::new(),
             stitch_text: StitchText::Thread,
+            show_thread_counts: true,
+            show_color_counts: true,
         }
     }
 }

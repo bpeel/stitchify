@@ -506,11 +506,17 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
 
         group.add_attribute("id", "color-counts");
 
+        let x_offset = if self.dimensions.show_thread_counts {
+            7.0
+        } else {
+            1.0
+        };
+
         group.add_attribute(
             "transform",
             format!(
                 "translate({} {})",
-                self.box_width * 7.0,
+                self.box_width * x_offset,
                 self.box_height * (self.fabric.n_rows() + 3) as f32,
             ),
         );
@@ -576,6 +582,19 @@ impl<'a, D: Document> SvgGenerator<'a, D> {
     }
 }
 
+fn calc_n_visible_rows(dimensions: &Dimensions, fabric: &Fabric) -> usize
+{
+    let n_fabric_rows = fabric.n_rows() as usize + 2;
+
+    if dimensions.show_thread_counts {
+        n_fabric_rows + 1 + fabric.threads().len()
+    } else if dimensions.show_color_counts {
+        n_fabric_rows + 1 + count_color_stitches(fabric.threads()).len()
+    } else {
+        n_fabric_rows
+    }
+}
+
 pub fn convert<D: Document>(
     document: &D,
     dimensions: &Dimensions,
@@ -591,10 +610,10 @@ pub fn convert<D: Document>(
         document,
     };
 
+    let n_visible_rows = calc_n_visible_rows(dimensions, fabric);
+
     let svg_width = (fabric.n_stitches() + 2) as f32 * BOX_WIDTH;
-    let svg_height = ((fabric.n_rows() as usize + 3 + fabric.threads().len())
-                      as f32
-                      * generator.box_height)
+    let svg_height = (n_visible_rows as f32 * generator.box_height)
         + LINE_WIDTH / 2.0;
 
     let mut svg = document.create_element("svg");
@@ -629,9 +648,13 @@ pub fn convert<D: Document>(
         StitchText::Ruler => svg.add_child(generator.generate_midline_rulers()),
     }
 
-    svg.add_child(generator.generate_thread_counts());
+    if dimensions.show_thread_counts {
+        svg.add_child(generator.generate_thread_counts());
+    }
 
-    svg.add_child(generator.generate_color_counts());
+    if dimensions.show_color_counts {
+        svg.add_child(generator.generate_color_counts());
+    }
 
     svg
 }
